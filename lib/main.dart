@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => FoodProvider()..loadFoodEntries(),
       child: MaterialApp(
-        title: 'Food Tracker',
+        title: 'Food Track',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: Colors.green,

@@ -157,7 +157,7 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text('Food Tracker'),
+        title: const Text('Food Track'),
         actions: [
           IconButton(
             icon: const Icon(Icons.favorite_border),
