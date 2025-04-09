@@ -189,22 +189,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: () async {
-              final selectedDate = await showDatePicker(
-                context: context,
-                initialDate: context.read<FoodProvider>().selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (selectedDate != null) {
-                await context
-                    .read<FoodProvider>()
-                    .setSelectedDate(selectedDate);
-              }
-            },
-          ),
         ],
       ),
       body: Consumer<FoodProvider>(
@@ -221,11 +205,85 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Always display the selected date
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0, bottom: 0),
-                  child: Text(
-                    DateFormat.yMMMd().format(selectedDate),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary),
-                    textAlign: TextAlign.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, size: 16),
+                        onPressed: () {
+                          // Navigate to previous day
+                          final prevDate =
+                              selectedDate.subtract(const Duration(days: 1));
+                          context
+                              .read<FoodProvider>()
+                              .setSelectedDate(prevDate);
+                        },
+                        tooltip: 'Previous day',
+                      ),
+                      InkWell(
+                        onTap: () async {
+                          final selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: foodProvider.selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (selectedDate != null) {
+                            await context
+                                .read<FoodProvider>()
+                                .setSelectedDate(selectedDate);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 4.0, horizontal: 8.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                DateFormat.yMMMd().format(selectedDate),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.calendar_today,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                        // Disable the forward arrow if we're already at today
+                        onPressed: isToday
+                            ? null
+                            : () {
+                                // Navigate to next day, but not beyond today
+                                final nextDate =
+                                    selectedDate.add(const Duration(days: 1));
+                                // Make sure we don't go beyond today
+                                if (nextDate.isBefore(today) ||
+                                    nextDate.year == today.year &&
+                                        nextDate.month == today.month &&
+                                        nextDate.day == today.day) {
+                                  context
+                                      .read<FoodProvider>()
+                                      .setSelectedDate(nextDate);
+                                }
+                              },
+                        tooltip:
+                            isToday ? 'Cannot go beyond today' : 'Next day',
+                      ),
+                    ],
                   ),
                 ),
                 DailySummaryWidget(summary: foodProvider.dailySummary),
