@@ -6,6 +6,8 @@ import '../models/favorite_item.dart';
 class FoodProvider with ChangeNotifier {
   final DBHelper _dbHelper = DBHelper();
   List<FoodEntry> _foodEntries = [];
+  List<FavoriteItem> _favorites = [];
+  DateTime _selectedDate = DateTime.now();
   Map<String, dynamic>? _dailySummary;
   Map<String, int> _mealTypeCounts = {
     'Breakfast': 0,
@@ -14,8 +16,9 @@ class FoodProvider with ChangeNotifier {
     'Snack': 0,
     'Coffee': 0,
   };
-  List<FavoriteItem> _favorites = [];
-  DateTime _selectedDate = DateTime.now();
+  // Added for analytics
+  List<FoodEntry> _allFoodEntries = [];
+  bool _hasLoadedAllEntries = false;
 
   List<FoodEntry> get foodEntries => _foodEntries;
   Map<String, dynamic>? get dailySummary => _dailySummary;
@@ -24,12 +27,33 @@ class FoodProvider with ChangeNotifier {
   DateTime get selectedDate => _selectedDate;
 
   Future<void> loadFoodEntries() async {
-    final entries = await _dbHelper.getFoodEntriesForDate(_selectedDate);
-    _foodEntries = entries.map((e) => FoodEntry.fromMap(e)).toList();
-    _dailySummary = await _dbHelper.getDailySummary(_selectedDate);
-    _mealTypeCounts = await _dbHelper.getMealTypeCounts(_selectedDate);
+    _foodEntries = await _loadEntriesForDate(_selectedDate);
     await loadFavorites();
+    _calculateDailySummary();
     notifyListeners();
+
+    // Load all entries for analytics if not already loaded
+    if (!_hasLoadedAllEntries) {
+      _loadAllEntries();
+    }
+  }
+
+  Future<void> _loadAllEntries() async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query('food_entries');
+
+    _allFoodEntries = List.generate(maps.length, (i) {
+      return FoodEntry.fromMap(maps[i]);
+    });
+
+    _hasLoadedAllEntries = true;
+    notifyListeners();
+  }
+
+  // Synchronous method to get all entries
+  List<FoodEntry> getAllFoodEntries() {
+    // If not loaded yet, return empty list (will be updated later)
+    return _allFoodEntries;
   }
 
   Future<void> addFoodEntry({
@@ -161,5 +185,38 @@ class FoodProvider with ChangeNotifier {
         .toList()
       ..sort((a, b) => (allItems[b] ?? 0).compareTo(allItems[a] ?? 0));
     return nonFavorited;
+  }
+
+  void _calculateDailySummary() {
+    if (_foodEntries.isEmpty) {
+      _dailySummary = null;
+      return;
+    }
+
+    int totalCalories = 0;
+    double totalProtein = 0.0;
+    double totalCarbs = 0.0;
+    double totalFat = 0.0;
+
+    for (var entry in _foodEntries) {
+      totalCalories += entry.calories;
+      totalProtein += entry.protein;
+      totalCarbs += entry.carbs;
+      totalFat += entry.fat;
+    }
+
+    _dailySummary = {
+      'total_calories': totalCalories,
+      'total_protein': totalProtein,
+      'total_carbs': totalCarbs,
+      'total_fat': totalFat,
+    };
+  }
+
+  Future<List<FoodEntry>> _loadEntriesForDate(DateTime date) async {
+    final entries = await _dbHelper.getFoodEntriesForDate(date);
+    _dailySummary = await _dbHelper.getDailySummary(date);
+    _mealTypeCounts = await _dbHelper.getMealTypeCounts(date);
+    return entries.map((e) => FoodEntry.fromMap(e)).toList();
   }
 }
