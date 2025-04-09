@@ -155,7 +155,7 @@ class FoodProvider with ChangeNotifier {
       carbs: favorite.carbs,
       fat: favorite.fat,
       mealType: favorite.mealType,
-      notes: 'Quick add',
+      notes: null,
       entryDate: _selectedDate,
     );
     // Move the used favorite to the start
