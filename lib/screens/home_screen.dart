@@ -6,6 +6,7 @@ import '../models/food_entry.dart';
 import '../models/favorite_item.dart';
 import 'add_food_screen.dart';
 import 'manage_favorites_screen.dart';
+import '../widgets/daily_summary_widget.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -149,6 +150,8 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: const Text('Food Tracker'),
         actions: [
           IconButton(
@@ -182,14 +185,15 @@ class HomeScreen extends StatelessWidget {
       ),
       body: Consumer<FoodProvider>(
         builder: (context, foodProvider, child) {
-          return Column(
-            children: [
-              _buildDailySummary(foodProvider.dailySummary),
-              _buildQuickAddSection(context, foodProvider.favorites),
-              Expanded(
-                child: _buildFoodEntriesList(foodProvider.foodEntries),
-              ),
-            ],
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                DailySummaryWidget(summary: foodProvider.dailySummary),
+                _buildQuickAddSection(context, foodProvider.favorites),
+                _buildFoodEntriesList(foodProvider.foodEntries),
+                const SizedBox(height: 80),
+              ],
+            ),
           );
         },
       ),
@@ -244,152 +248,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDailySummary(Map<String, dynamic>? summary) {
-    if (summary == null) {
-      return const Card(
-        margin: EdgeInsets.all(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('No entries for today'),
-        ),
-      );
-    }
-
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Daily Summary',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNutritionInfo(
-                  'Calories',
-                  '${summary['total_calories']}',
-                  Icons.local_fire_department,
-                ),
-                _buildNutritionInfo(
-                  'Protein',
-                  '${summary['total_protein']}g',
-                  Icons.fitness_center,
-                ),
-                _buildNutritionInfo(
-                  'Carbs',
-                  '${summary['total_carbs']}g',
-                  Icons.grain,
-                ),
-                _buildNutritionInfo(
-                  'Fat',
-                  '${summary['total_fat']}g',
-                  Icons.water_drop,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Meal Distribution',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Consumer<FoodProvider>(
-              builder: (context, foodProvider, child) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildMealTypeInfo(
-                      'Breakfast',
-                      foodProvider.mealTypeCounts['Breakfast'] ?? 0,
-                      Icons.breakfast_dining,
-                    ),
-                    _buildMealTypeInfo(
-                      'Lunch',
-                      foodProvider.mealTypeCounts['Lunch'] ?? 0,
-                      Icons.lunch_dining,
-                    ),
-                    _buildMealTypeInfo(
-                      'Dinner',
-                      foodProvider.mealTypeCounts['Dinner'] ?? 0,
-                      Icons.dinner_dining,
-                    ),
-                    _buildMealTypeInfo(
-                      'Snack',
-                      foodProvider.mealTypeCounts['Snack'] ?? 0,
-                      Icons.cookie,
-                    ),
-                    _buildMealTypeInfo(
-                      'Coffee',
-                      foodProvider.mealTypeCounts['Coffee'] ?? 0,
-                      Icons.coffee,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNutritionInfo(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMealTypeInfo(String label, int count, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon),
-        const SizedBox(height: 4),
-        Text(
-          '$count',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildFoodEntriesList(List<FoodEntry> entries) {
     if (entries.isEmpty) {
       return const Center(
@@ -398,7 +256,8 @@ class HomeScreen extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
