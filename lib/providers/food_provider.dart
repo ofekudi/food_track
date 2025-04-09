@@ -58,6 +58,11 @@ class FoodProvider with ChangeNotifier {
     await loadFoodEntries();
   }
 
+  Future<void> updateFoodEntry(FoodEntry entry) async {
+    await _dbHelper.updateFoodEntry(entry);
+    await loadFoodEntries();
+  }
+
   Future<void> setSelectedDate(DateTime date) async {
     _selectedDate = date;
     await loadFoodEntries();

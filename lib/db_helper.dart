@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
 import 'models/favorite_item.dart';
+import 'models/food_entry.dart';
 
 class DBHelper {
   static final DBHelper _instance = DBHelper._internal();
@@ -281,5 +282,20 @@ class DBHelper {
       conflictAlgorithm: ConflictAlgorithm
           .replace, // Or use ignore/fail based on desired behavior
     );
+  }
+
+  // --- Food Entry Methods (Add update) ---
+
+  Future<void> updateFoodEntry(FoodEntry entry) async {
+    final Database db = await database;
+    await db.update(
+      'food_entries',
+      entry.toMap(), // Use the toMap method from the FoodEntry model
+      where: 'id = ?',
+      whereArgs: [entry.id],
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    // After updating an entry, we need to recalculate the daily summary
+    await _updateDailySummary(entry.createdAt);
   }
 }

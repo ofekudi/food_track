@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/food_provider.dart';
 import '../models/favorite_item.dart';
+import '../models/food_entry.dart';
 
 class AddFoodScreen extends StatefulWidget {
   final FavoriteItem? favoriteToEdit;
+  final FoodEntry? entryToEdit;
 
-  const AddFoodScreen({super.key, this.favoriteToEdit});
+  const AddFoodScreen({
+    super.key,
+    this.favoriteToEdit,
+    this.entryToEdit,
+  }) : assert(favoriteToEdit == null || entryToEdit == null,
+            'Cannot edit both a favorite and an entry at the same time');
 
   @override
   State<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -23,7 +30,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final _nameFocusNode = FocusNode();
   String _selectedMealType = 'Breakfast';
 
-  bool get _isEditing => widget.favoriteToEdit != null;
+  bool get _isEditingFavorite => widget.favoriteToEdit != null;
+  bool get _isEditingEntry => widget.entryToEdit != null;
+  bool get _isEditing => _isEditingFavorite || _isEditingEntry;
 
   final List<String> _mealTypes = [
     'Breakfast',
@@ -37,7 +46,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   void initState() {
     super.initState();
 
-    if (_isEditing) {
+    if (_isEditingFavorite) {
       final fav = widget.favoriteToEdit!;
       _nameController.text = fav.name;
       _caloriesController.text = fav.calories.toString();
@@ -45,6 +54,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       _carbsController.text = fav.carbs.toString();
       _fatController.text = fav.fat.toString();
       _selectedMealType = fav.mealType;
+    } else if (_isEditingEntry) {
+      final entry = widget.entryToEdit!;
+      _nameController.text = entry.name;
+      _caloriesController.text = entry.calories.toString();
+      _proteinController.text = entry.protein.toString();
+      _carbsController.text = entry.carbs.toString();
+      _fatController.text = entry.fat.toString();
+      _notesController.text = entry.notes ?? '';
+      _selectedMealType = entry.mealType;
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _nameFocusNode.requestFocus();
@@ -66,10 +84,21 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String title;
+    String buttonText;
+    if (_isEditingFavorite) {
+      title = 'Edit Favorite';
+      buttonText = 'Update Favorite';
+    } else if (_isEditingEntry) {
+      title = 'Edit Entry';
+      buttonText = 'Update Entry';
+    } else {
+      title = 'Add Food Entry';
+      buttonText = 'Add Food Entry';
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Favorite' : 'Add Food Entry'),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -167,7 +196,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (!_isEditing)
+              if (!_isEditingFavorite)
                 TextFormField(
                   controller: _notesController,
                   decoration: const InputDecoration(
@@ -194,8 +223,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     final fat = _fatController.text.isEmpty
                         ? 0.0
                         : double.parse(_fatController.text);
+                    final notes = _notesController.text.isEmpty
+                        ? null
+                        : _notesController.text;
 
-                    if (_isEditing) {
+                    if (_isEditingFavorite) {
                       final updatedFavorite = FavoriteItem(
                         id: widget.favoriteToEdit!.id,
                         name: name,
@@ -212,6 +244,25 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         );
                         Navigator.pop(context);
                       }
+                    } else if (_isEditingEntry) {
+                      final updatedEntry = FoodEntry(
+                        id: widget.entryToEdit!.id,
+                        createdAt: widget.entryToEdit!.createdAt,
+                        name: name,
+                        calories: calories,
+                        protein: protein,
+                        carbs: carbs,
+                        fat: fat,
+                        mealType: _selectedMealType,
+                        notes: notes,
+                      );
+                      await provider.updateFoodEntry(updatedEntry);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Entry "$name" updated!')),
+                        );
+                        Navigator.pop(context);
+                      }
                     } else {
                       await provider.addFoodEntry(
                         name: name,
@@ -220,9 +271,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         carbs: carbs,
                         fat: fat,
                         mealType: _selectedMealType,
-                        notes: _notesController.text.isEmpty
-                            ? null
-                            : _notesController.text,
+                        notes: notes,
                       );
                       if (mounted) {
                         Navigator.pop(context);
@@ -233,7 +282,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    _isEditing ? 'Update Favorite' : 'Add Food Entry',
+                    buttonText,
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
