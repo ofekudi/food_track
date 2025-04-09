@@ -3,10 +3,46 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/food_provider.dart';
 import '../models/food_entry.dart';
+import '../models/favorite_item.dart';
 import 'add_food_screen.dart';
+import 'manage_favorites_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  void _showNutritionDetails(BuildContext context, FoodEntry entry) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(entry.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Meal Type: ${entry.mealType}'),
+            const SizedBox(height: 8),
+            Text('Calories: ${entry.calories} kcal'),
+            const SizedBox(height: 8),
+            Text('Protein: ${entry.protein}g'),
+            const SizedBox(height: 8),
+            Text('Carbs: ${entry.carbs}g'),
+            const SizedBox(height: 8),
+            Text('Fat: ${entry.fat}g'),
+            if (entry.notes != null && entry.notes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Notes: ${entry.notes}'),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +50,17 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Food Tracker'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite_border),
+            tooltip: 'Manage Favorites',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const ManageFavoritesScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () async {
@@ -37,6 +84,7 @@ class HomeScreen extends StatelessWidget {
           return Column(
             children: [
               _buildDailySummary(foodProvider.dailySummary),
+              _buildQuickAddSection(context, foodProvider.favorites),
               Expanded(
                 child: _buildFoodEntriesList(foodProvider.foodEntries),
               ),
@@ -54,6 +102,43 @@ class HomeScreen extends StatelessWidget {
           );
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildQuickAddSection(
+      BuildContext context, List<FavoriteItem> favorites) {
+    if (favorites.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quick Add',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: favorites.map((fav) {
+              return ActionChip(
+                avatar: const Icon(Icons.flash_on, size: 16),
+                label: Text(fav.name),
+                onPressed: () {
+                  context.read<FoodProvider>().addFoodEntryFromFavorite(fav);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added ${fav.name}!')),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+          const Divider(height: 16),
+        ],
       ),
     );
   }
@@ -109,6 +194,49 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Text(
+              'Meal Distribution',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Consumer<FoodProvider>(
+              builder: (context, foodProvider, child) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildMealTypeInfo(
+                      'Breakfast',
+                      foodProvider.mealTypeCounts['Breakfast'] ?? 0,
+                      Icons.breakfast_dining,
+                    ),
+                    _buildMealTypeInfo(
+                      'Lunch',
+                      foodProvider.mealTypeCounts['Lunch'] ?? 0,
+                      Icons.lunch_dining,
+                    ),
+                    _buildMealTypeInfo(
+                      'Dinner',
+                      foodProvider.mealTypeCounts['Dinner'] ?? 0,
+                      Icons.dinner_dining,
+                    ),
+                    _buildMealTypeInfo(
+                      'Snack',
+                      foodProvider.mealTypeCounts['Snack'] ?? 0,
+                      Icons.cookie,
+                    ),
+                    _buildMealTypeInfo(
+                      'Coffee',
+                      foodProvider.mealTypeCounts['Coffee'] ?? 0,
+                      Icons.coffee,
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -122,6 +250,29 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMealTypeInfo(String label, int count, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon),
+        const SizedBox(height: 4),
+        Text(
+          '$count',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -153,24 +304,14 @@ class HomeScreen extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             title: Text(entry.name),
-            subtitle: Text(
-              '${entry.calories} kcal • ${entry.mealType}',
+            subtitle: Text(entry.mealType),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () {
+                context.read<FoodProvider>().deleteFoodEntry(entry.id);
+              },
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${entry.protein}g P • ${entry.carbs}g C • ${entry.fat}g F',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () {
-                    context.read<FoodProvider>().deleteFoodEntry(entry.id);
-                  },
-                ),
-              ],
-            ),
+            onTap: () => _showNutritionDetails(context, entry),
           ),
         );
       },

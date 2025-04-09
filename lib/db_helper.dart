@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
+import 'models/favorite_item.dart';
 
 class DBHelper {
   static final DBHelper _instance = DBHelper._internal();
@@ -48,6 +49,18 @@ class DBHelper {
         total_protein REAL,
         total_carbs REAL,
         total_fat REAL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE favorites(
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        calories INTEGER DEFAULT 0,
+        protein REAL DEFAULT 0.0,
+        carbs REAL DEFAULT 0.0,
+        fat REAL DEFAULT 0.0,
+        meal_type TEXT NOT NULL
       )
     ''');
   }
@@ -182,6 +195,91 @@ class DBHelper {
       where: 'name LIKE ?',
       whereArgs: ['%$query%'],
       orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<Map<String, int>> getMealTypeCounts(DateTime date) async {
+    final Database db = await database;
+    final dateStr = DateTime(date.year, date.month, date.day)
+        .toIso8601String()
+        .split('T')[0];
+
+    final entries = await db.query(
+      'food_entries',
+      where: 'date(created_at) = ?',
+      whereArgs: [dateStr],
+    );
+
+    Map<String, int> counts = {
+      'Breakfast': 0,
+      'Lunch': 0,
+      'Dinner': 0,
+      'Snack': 0,
+      'Coffee': 0,
+    };
+
+    for (var entry in entries) {
+      final mealType = entry['meal_type'] as String;
+      counts[mealType] = (counts[mealType] ?? 0) + 1;
+    }
+
+    return counts;
+  }
+
+  // --- Favorites Methods ---
+
+  Future<String> addFavorite({
+    required String name,
+    required int calories,
+    required double protein,
+    required double carbs,
+    required double fat,
+    required String mealType,
+  }) async {
+    final Database db = await database;
+    final String id = uuid.v4();
+
+    await db.insert(
+      'favorites',
+      {
+        'id': id,
+        'name': name,
+        'calories': calories,
+        'protein': protein,
+        'carbs': carbs,
+        'fat': fat,
+        'meal_type': mealType,
+      },
+      conflictAlgorithm: ConflictAlgorithm
+          .replace, // Replace if name exists? Or handle duplicates differently?
+      // For now, let's assume unique IDs
+    );
+    return id;
+  }
+
+  Future<List<Map<String, dynamic>>> getFavorites() async {
+    final Database db = await database;
+    return await db.query('favorites', orderBy: 'name ASC');
+  }
+
+  Future<void> deleteFavorite(String id) async {
+    final Database db = await database;
+    await db.delete(
+      'favorites',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> updateFavorite(FavoriteItem favorite) async {
+    final Database db = await database;
+    await db.update(
+      'favorites',
+      favorite.toMap(), // Use the toMap method from the FavoriteItem model
+      where: 'id = ?',
+      whereArgs: [favorite.id],
+      conflictAlgorithm: ConflictAlgorithm
+          .replace, // Or use ignore/fail based on desired behavior
     );
   }
 }
