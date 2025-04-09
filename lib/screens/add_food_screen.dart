@@ -100,7 +100,93 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (_formKey.currentState!.validate()) {
+                final provider = context.read<FoodProvider>();
+                final name = _selectedFoodName;
+                final calories = _caloriesController.text.isEmpty
+                    ? 0
+                    : int.parse(_caloriesController.text);
+                final protein = _proteinController.text.isEmpty
+                    ? 0.0
+                    : double.parse(_proteinController.text);
+                final carbs = _carbsController.text.isEmpty
+                    ? 0.0
+                    : double.parse(_carbsController.text);
+                final fat = _fatController.text.isEmpty
+                    ? 0.0
+                    : double.parse(_fatController.text);
+                final notes = _notesController.text.isEmpty
+                    ? null
+                    : _notesController.text;
+
+                if (_isEditingFavorite) {
+                  final updatedFavorite = FavoriteItem(
+                    id: widget.favoriteToEdit!.id,
+                    name: name,
+                    calories: calories,
+                    protein: protein,
+                    carbs: carbs,
+                    fat: fat,
+                    mealType: _selectedMealType,
+                  );
+                  await provider.updateFavorite(updatedFavorite);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Favorite "$name" updated!')),
+                    );
+                    Navigator.pop(context);
+                  }
+                } else if (_isEditingEntry) {
+                  final updatedEntry = FoodEntry(
+                    id: widget.entryToEdit!.id,
+                    createdAt: widget.entryToEdit!.createdAt,
+                    entryDate: widget.entryToEdit!.entryDate,
+                    name: name,
+                    calories: calories,
+                    protein: protein,
+                    carbs: carbs,
+                    fat: fat,
+                    mealType: _selectedMealType,
+                    notes: notes,
+                  );
+                  await provider.updateFoodEntry(updatedEntry);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Entry "$name" updated!')),
+                    );
+                    Navigator.pop(context);
+                  }
+                } else {
+                  await provider.addFoodEntry(
+                    name: name,
+                    calories: calories,
+                    protein: protein,
+                    carbs: carbs,
+                    fat: fat,
+                    mealType: _selectedMealType,
+                    notes: notes,
+                    entryDate: widget.targetDate,
+                  );
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                }
+              }
+            },
+            child: const Text(
+              'Add',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -276,90 +362,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   ),
                   maxLines: 3,
                 ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    final provider = context.read<FoodProvider>();
-                    final name = _selectedFoodName;
-                    final calories = _caloriesController.text.isEmpty
-                        ? 0
-                        : int.parse(_caloriesController.text);
-                    final protein = _proteinController.text.isEmpty
-                        ? 0.0
-                        : double.parse(_proteinController.text);
-                    final carbs = _carbsController.text.isEmpty
-                        ? 0.0
-                        : double.parse(_carbsController.text);
-                    final fat = _fatController.text.isEmpty
-                        ? 0.0
-                        : double.parse(_fatController.text);
-                    final notes = _notesController.text.isEmpty
-                        ? null
-                        : _notesController.text;
-
-                    if (_isEditingFavorite) {
-                      final updatedFavorite = FavoriteItem(
-                        id: widget.favoriteToEdit!.id,
-                        name: name,
-                        calories: calories,
-                        protein: protein,
-                        carbs: carbs,
-                        fat: fat,
-                        mealType: _selectedMealType,
-                      );
-                      await provider.updateFavorite(updatedFavorite);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Favorite "$name" updated!')),
-                        );
-                        Navigator.pop(context);
-                      }
-                    } else if (_isEditingEntry) {
-                      final updatedEntry = FoodEntry(
-                        id: widget.entryToEdit!.id,
-                        createdAt: widget.entryToEdit!.createdAt,
-                        entryDate: widget.entryToEdit!.entryDate,
-                        name: name,
-                        calories: calories,
-                        protein: protein,
-                        carbs: carbs,
-                        fat: fat,
-                        mealType: _selectedMealType,
-                        notes: notes,
-                      );
-                      await provider.updateFoodEntry(updatedEntry);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Entry "$name" updated!')),
-                        );
-                        Navigator.pop(context);
-                      }
-                    } else {
-                      await provider.addFoodEntry(
-                        name: name,
-                        calories: calories,
-                        protein: protein,
-                        carbs: carbs,
-                        fat: fat,
-                        mealType: _selectedMealType,
-                        notes: notes,
-                        entryDate: widget.targetDate,
-                      );
-                      if (mounted) {
-                        Navigator.pop(context);
-                      }
-                    }
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    buttonText,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
