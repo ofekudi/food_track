@@ -303,4 +303,50 @@ class DBHelper {
       orderBy: 'created_at ASC',
     );
   }
+
+  Future<Map<String, int>> getAllFoodFrequencies() async {
+    final db = await database;
+
+    // Get frequencies from food entries
+    final List<Map<String, dynamic>> entriesResult = await db.rawQuery('''
+      SELECT name, COUNT(*) as frequency
+      FROM food_entries
+      GROUP BY name
+    ''');
+
+    // Convert to Map<String, int>
+    Map<String, int> frequencies = {};
+    for (var row in entriesResult) {
+      frequencies[row['name'] as String] = row['frequency'] as int;
+    }
+
+    // Add favorites to the frequencies (count as 1 if not already counted)
+    final List<Map<String, dynamic>> favorites = await db.query('favorites');
+    for (var favorite in favorites) {
+      String name = favorite['name'] as String;
+      frequencies[name] = frequencies[name] ?? 1;
+    }
+
+    return frequencies;
+  }
+
+  Future<List<String>> searchFoodNames(String query) async {
+    final db = await database;
+
+    // Search in both food entries and favorites
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+      SELECT DISTINCT name, 
+             (SELECT COUNT(*) FROM food_entries fe WHERE fe.name = e.name) as frequency
+      FROM (
+        SELECT name FROM food_entries
+        UNION
+        SELECT name FROM favorites
+      ) e
+      WHERE name LIKE ?
+      ORDER BY frequency DESC
+      LIMIT 5
+    ''', ['%$query%']);
+
+    return results.map((row) => row['name'] as String).toList();
+  }
 }

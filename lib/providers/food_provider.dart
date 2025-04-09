@@ -124,4 +124,18 @@ class FoodProvider with ChangeNotifier {
       entryDate: _selectedDate,
     );
   }
+
+  // Get sorted food suggestions based on frequency
+  Future<List<String>> getFoodSuggestions(String query) async {
+    if (query.isEmpty) {
+      // Get top 5 most used items from all entries
+      final frequencies = await _dbHelper.getAllFoodFrequencies();
+      final sortedEntries = frequencies.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      return sortedEntries.take(5).map((e) => e.key).toList();
+    }
+
+    // Search through all food names in the database
+    return _dbHelper.searchFoodNames(query);
+  }
 }

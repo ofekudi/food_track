@@ -23,7 +23,8 @@ class AddFoodScreen extends StatefulWidget {
 
 class _AddFoodScreenState extends State<AddFoodScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  late String _selectedFoodName =
+      widget.favoriteToEdit?.name ?? widget.entryToEdit?.name ?? '';
   final _caloriesController = TextEditingController();
   final _proteinController = TextEditingController();
   final _carbsController = TextEditingController();
@@ -50,7 +51,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
     if (_isEditingFavorite) {
       final fav = widget.favoriteToEdit!;
-      _nameController.text = fav.name;
+      _selectedFoodName = fav.name;
       _caloriesController.text = fav.calories.toString();
       _proteinController.text = fav.protein.toString();
       _carbsController.text = fav.carbs.toString();
@@ -58,7 +59,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       _selectedMealType = fav.mealType;
     } else if (_isEditingEntry) {
       final entry = widget.entryToEdit!;
-      _nameController.text = entry.name;
+      _selectedFoodName = entry.name;
       _caloriesController.text = entry.calories.toString();
       _proteinController.text = entry.protein.toString();
       _carbsController.text = entry.carbs.toString();
@@ -74,7 +75,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _carbsController.dispose();
@@ -108,21 +108,89 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _nameController,
-                focusNode: _nameFocusNode,
-                autofocus: !_isEditing,
-                decoration: const InputDecoration(
-                  labelText: 'Food Name *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a food name';
-                  }
-                  return null;
+              Autocomplete<String>(
+                initialValue: TextEditingValue(text: _selectedFoodName),
+                optionsBuilder: (TextEditingValue textEditingValue) async {
+                  return await context
+                      .read<FoodProvider>()
+                      .getFoodSuggestions(textEditingValue.text);
                 },
-                textInputAction: TextInputAction.next,
+                onSelected: (String selection) {
+                  _selectedFoodName = selection;
+                  // Auto-fill data from favorites if available
+                  final favorites = context.read<FoodProvider>().favorites;
+                  final matchingFavorite = favorites.firstWhere(
+                    (favorite) => favorite.name == selection,
+                    orElse: () => FavoriteItem(
+                      id: '',
+                      name: '',
+                      calories: 0,
+                      protein: 0,
+                      carbs: 0,
+                      fat: 0,
+                      mealType: _selectedMealType,
+                    ),
+                  );
+
+                  if (matchingFavorite.name.isNotEmpty) {
+                    setState(() {
+                      _caloriesController.text =
+                          matchingFavorite.calories.toString();
+                      _proteinController.text =
+                          matchingFavorite.protein.toString();
+                      _carbsController.text = matchingFavorite.carbs.toString();
+                      _fatController.text = matchingFavorite.fat.toString();
+                      _selectedMealType = matchingFavorite.mealType;
+                    });
+                  }
+                },
+                fieldViewBuilder: (BuildContext context,
+                    TextEditingController textEditingController,
+                    FocusNode focusNode,
+                    VoidCallback onFieldSubmitted) {
+                  return TextFormField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Food Name *',
+                      border: OutlineInputBorder(),
+                      helperText: 'Start typing to see suggestions',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a food name';
+                      }
+                      return null;
+                    },
+                    onChanged: (value) => _selectedFoodName = value,
+                  );
+                },
+                optionsViewBuilder: (BuildContext context,
+                    AutocompleteOnSelected<String> onSelected,
+                    Iterable<String> options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4.0,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 400),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(8.0),
+                          itemCount: options.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final String option = options.elementAt(index);
+                            return ListTile(
+                              title: Text(option),
+                              onTap: () {
+                                onSelected(option);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
@@ -212,7 +280,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
                     final provider = context.read<FoodProvider>();
-                    final name = _nameController.text;
+                    final name = _selectedFoodName;
                     final calories = _caloriesController.text.isEmpty
                         ? 0
                         : int.parse(_caloriesController.text);
@@ -298,7 +366,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     icon: const Icon(Icons.favorite_border, size: 18),
                     label: const Text('Save as Favorite'),
                     onPressed: () {
-                      if (_nameController.text.isEmpty) {
+                      if (_selectedFoodName.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text(
@@ -307,7 +375,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         return;
                       }
                       context.read<FoodProvider>().addFavorite(
-                            name: _nameController.text,
+                            name: _selectedFoodName,
                             calories: _caloriesController.text.isEmpty
                                 ? 0
                                 : int.parse(_caloriesController.text),
@@ -325,7 +393,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                             content: Text(
-                                '${_nameController.text} saved as favorite!')),
+                                '${_selectedFoodName} saved as favorite!')),
                       );
                     },
                   ),
