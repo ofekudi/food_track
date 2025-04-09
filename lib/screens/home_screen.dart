@@ -99,11 +99,16 @@ class HomeScreen extends StatelessWidget {
                         label: const Text('Edit'),
                         onPressed: () {
                           Navigator.of(ctx).pop(); // Close dialog
+                          // Get current selected date for context
+                          final selectedDate =
+                              context.read<FoodProvider>().selectedDate;
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  AddFoodScreen(entryToEdit: entry),
+                              builder: (context) => AddFoodScreen(
+                                  entryToEdit: entry,
+                                  targetDate: selectedDate // Pass date
+                                  ),
                             ),
                           );
                         },
@@ -185,9 +190,25 @@ class HomeScreen extends StatelessWidget {
       ),
       body: Consumer<FoodProvider>(
         builder: (context, foodProvider, child) {
+          final selectedDate = foodProvider.selectedDate;
+          final today = DateTime.now();
+          final isToday = selectedDate.year == today.year &&
+              selectedDate.month == today.month &&
+              selectedDate.day == today.day;
+
           return SingleChildScrollView(
             child: Column(
               children: [
+                // Always display the selected date
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0, bottom: 0),
+                  child: Text(
+                    DateFormat.yMMMd().format(selectedDate),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 DailySummaryWidget(summary: foodProvider.dailySummary),
                 _buildQuickAddSection(context, foodProvider.favorites),
                 _buildFoodEntriesList(foodProvider.foodEntries),
@@ -199,10 +220,13 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // Get the currently selected date from the provider
+          final selectedDate = context.read<FoodProvider>().selectedDate;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddFoodScreen(),
+              // Pass the selected date to AddFoodScreen
+              builder: (context) => AddFoodScreen(targetDate: selectedDate),
             ),
           );
         },

@@ -70,12 +70,16 @@ class ManageFavoritesScreen extends StatelessWidget {
                     },
                   ),
                   onTap: () {
-                    // Navigate to AddFoodScreen for editing
+                    // Get the current date from provider
+                    final selectedDate =
+                        context.read<FoodProvider>().selectedDate;
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            AddFoodScreen(favoriteToEdit: fav),
+                        builder: (context) => AddFoodScreen(
+                          favoriteToEdit: fav,
+                          targetDate: selectedDate, // Pass the date
+                        ),
                       ),
                     );
                   },

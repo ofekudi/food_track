@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
@@ -39,9 +40,12 @@ class DBHelper {
         fat REAL,
         notes TEXT,
         created_at TEXT NOT NULL,
-        meal_type TEXT NOT NULL
+        meal_type TEXT NOT NULL,
+        entry_date TEXT NOT NULL
       )
     ''');
+    await db
+        .execute('CREATE INDEX idx_entry_date ON food_entries(entry_date);');
 
     await db.execute('''
       CREATE TABLE daily_summaries(
@@ -74,10 +78,12 @@ class DBHelper {
     required double fat,
     required String mealType,
     String? notes,
+    required DateTime entryDate,
   }) async {
     final Database db = await database;
     final String id = uuid.v4();
     final now = DateTime.now();
+    final String entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
 
     await db.insert(
       'food_entries',
@@ -91,42 +97,37 @@ class DBHelper {
         'notes': notes,
         'created_at': now.toIso8601String(),
         'meal_type': mealType,
+        'entry_date': entryDateStr,
       },
     );
 
-    // Update daily summary
-    await _updateDailySummary(now);
+    await _updateDailySummary(entryDate);
 
     return id;
   }
 
   Future<void> _updateDailySummary(DateTime date) async {
     final Database db = await database;
-    final dateStr = DateTime(date.year, date.month, date.day)
-        .toIso8601String()
-        .split('T')[0];
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
 
-    // Get all entries for the day
     final entries = await db.query(
       'food_entries',
-      where: 'date(created_at) = ?',
+      where: 'entry_date = ?',
       whereArgs: [dateStr],
     );
 
-    // Calculate totals
     int totalCalories = 0;
     double totalProtein = 0;
     double totalCarbs = 0;
     double totalFat = 0;
 
     for (var entry in entries) {
-      totalCalories += entry['calories'] as int;
-      totalProtein += entry['protein'] as double;
-      totalCarbs += entry['carbs'] as double;
-      totalFat += entry['fat'] as double;
+      totalCalories += (entry['calories'] as int?) ?? 0;
+      totalProtein += (entry['protein'] as double?) ?? 0.0;
+      totalCarbs += (entry['carbs'] as double?) ?? 0.0;
+      totalFat += (entry['fat'] as double?) ?? 0.0;
     }
 
-    // Update or insert daily summary
     await db.insert(
       'daily_summaries',
       {
@@ -143,13 +144,10 @@ class DBHelper {
   Future<List<Map<String, dynamic>>> getFoodEntriesForDate(
       DateTime date) async {
     final Database db = await database;
-    final dateStr = DateTime(date.year, date.month, date.day)
-        .toIso8601String()
-        .split('T')[0];
-
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
     return await db.query(
       'food_entries',
-      where: 'date(created_at) = ?',
+      where: 'entry_date = ?',
       whereArgs: [dateStr],
       orderBy: 'created_at DESC',
     );
@@ -157,35 +155,40 @@ class DBHelper {
 
   Future<Map<String, dynamic>?> getDailySummary(DateTime date) async {
     final Database db = await database;
-    final dateStr = DateTime(date.year, date.month, date.day)
-        .toIso8601String()
-        .split('T')[0];
-
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final List<Map<String, dynamic>> summaries = await db.query(
       'daily_summaries',
       where: 'date = ?',
       whereArgs: [dateStr],
+      limit: 1,
     );
-
     return summaries.isNotEmpty ? summaries.first : null;
   }
 
   Future<void> deleteFoodEntry(String id) async {
     final Database db = await database;
-    final entry = await db.query(
+    final entries = await db.query(
       'food_entries',
       where: 'id = ?',
       whereArgs: [id],
+      limit: 1,
     );
 
-    if (entry.isNotEmpty) {
-      final createdAt = DateTime.parse(entry.first['created_at'] as String);
+    if (entries.isNotEmpty) {
+      final entryDateStr = entries.first['entry_date'] as String?;
       await db.delete(
         'food_entries',
         where: 'id = ?',
         whereArgs: [id],
       );
-      await _updateDailySummary(createdAt);
+      if (entryDateStr != null) {
+        try {
+          final entryDate = DateFormat('yyyy-MM-dd').parse(entryDateStr);
+          await _updateDailySummary(entryDate);
+        } catch (e) {
+          // print("Error parsing entry_date for summary update after delete: $e");
+        }
+      }
     }
   }
 
@@ -201,16 +204,12 @@ class DBHelper {
 
   Future<Map<String, int>> getMealTypeCounts(DateTime date) async {
     final Database db = await database;
-    final dateStr = DateTime(date.year, date.month, date.day)
-        .toIso8601String()
-        .split('T')[0];
-
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final entries = await db.query(
       'food_entries',
-      where: 'date(created_at) = ?',
+      where: 'entry_date = ?',
       whereArgs: [dateStr],
     );
-
     Map<String, int> counts = {
       'Breakfast': 0,
       'Lunch': 0,
@@ -218,16 +217,14 @@ class DBHelper {
       'Snack': 0,
       'Coffee': 0,
     };
-
     for (var entry in entries) {
-      final mealType = entry['meal_type'] as String;
-      counts[mealType] = (counts[mealType] ?? 0) + 1;
+      final mealType = entry['meal_type'] as String?;
+      if (mealType != null && counts.containsKey(mealType)) {
+        counts[mealType] = counts[mealType]! + 1;
+      }
     }
-
     return counts;
   }
-
-  // --- Favorites Methods ---
 
   Future<String> addFavorite({
     required String name,
@@ -251,9 +248,7 @@ class DBHelper {
         'fat': fat,
         'meal_type': mealType,
       },
-      conflictAlgorithm: ConflictAlgorithm
-          .replace, // Replace if name exists? Or handle duplicates differently?
-      // For now, let's assume unique IDs
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
     return id;
   }
@@ -276,26 +271,36 @@ class DBHelper {
     final Database db = await database;
     await db.update(
       'favorites',
-      favorite.toMap(), // Use the toMap method from the FavoriteItem model
+      favorite.toMap(),
       where: 'id = ?',
       whereArgs: [favorite.id],
-      conflictAlgorithm: ConflictAlgorithm
-          .replace, // Or use ignore/fail based on desired behavior
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
-
-  // --- Food Entry Methods (Add update) ---
 
   Future<void> updateFoodEntry(FoodEntry entry) async {
     final Database db = await database;
     await db.update(
       'food_entries',
-      entry.toMap(), // Use the toMap method from the FoodEntry model
+      entry.toMap(),
       where: 'id = ?',
       whereArgs: [entry.id],
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    // After updating an entry, we need to recalculate the daily summary
-    await _updateDailySummary(entry.createdAt);
+    await _updateDailySummary(entry.entryDate);
+  }
+
+  Future<List<Map<String, dynamic>>> getFoodEntriesBetweenDates(
+      DateTime startDate, DateTime endDate) async {
+    final Database db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    return await db.query(
+      'food_entries',
+      where: 'entry_date >= ? AND entry_date <= ?',
+      whereArgs: [startDateStr, endDateStr],
+      orderBy: 'created_at ASC',
+    );
   }
 }

@@ -40,6 +40,7 @@ class FoodProvider with ChangeNotifier {
     required double fat,
     required String mealType,
     String? notes,
+    required DateTime entryDate,
   }) async {
     await _dbHelper.addFoodEntry(
       name: name,
@@ -49,6 +50,7 @@ class FoodProvider with ChangeNotifier {
       fat: fat,
       mealType: mealType,
       notes: notes,
+      entryDate: entryDate,
     );
     await loadFoodEntries();
   }
@@ -119,6 +121,7 @@ class FoodProvider with ChangeNotifier {
       fat: favorite.fat,
       mealType: favorite.mealType,
       notes: 'Quick add',
+      entryDate: _selectedDate,
     );
   }
 }

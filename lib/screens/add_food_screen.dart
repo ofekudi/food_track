@@ -7,11 +7,13 @@ import '../models/food_entry.dart';
 class AddFoodScreen extends StatefulWidget {
   final FavoriteItem? favoriteToEdit;
   final FoodEntry? entryToEdit;
+  final DateTime targetDate;
 
   const AddFoodScreen({
     super.key,
     this.favoriteToEdit,
     this.entryToEdit,
+    required this.targetDate,
   }) : assert(favoriteToEdit == null || entryToEdit == null,
             'Cannot edit both a favorite and an entry at the same time');
 
@@ -248,6 +250,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       final updatedEntry = FoodEntry(
                         id: widget.entryToEdit!.id,
                         createdAt: widget.entryToEdit!.createdAt,
+                        entryDate: widget.entryToEdit!.entryDate,
                         name: name,
                         calories: calories,
                         protein: protein,
@@ -272,6 +275,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         fat: fat,
                         mealType: _selectedMealType,
                         notes: notes,
+                        entryDate: widget.targetDate,
                       );
                       if (mounted) {
                         Navigator.pop(context);
