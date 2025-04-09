@@ -112,6 +112,17 @@ class FoodProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> moveFavoriteToStart(String favoriteId) async {
+    // Find the favorite item
+    final index = _favorites.indexWhere((fav) => fav.id == favoriteId);
+    if (index > 0) {
+      // Only move if it's not already at the start
+      final favorite = _favorites.removeAt(index);
+      _favorites.insert(0, favorite);
+      notifyListeners();
+    }
+  }
+
   Future<void> addFoodEntryFromFavorite(FavoriteItem favorite) async {
     await addFoodEntry(
       name: favorite.name,
@@ -123,6 +134,8 @@ class FoodProvider with ChangeNotifier {
       notes: 'Quick add',
       entryDate: _selectedDate,
     );
+    // Move the used favorite to the start
+    await moveFavoriteToStart(favorite.id);
   }
 
   // Get sorted food suggestions based on frequency
@@ -137,5 +150,16 @@ class FoodProvider with ChangeNotifier {
 
     // Search through all food names in the database
     return _dbHelper.searchFoodNames(query);
+  }
+
+  // Get non-favorited items from database
+  Future<List<String>> getNonFavoritedItems() async {
+    final allItems = await _dbHelper.getAllFoodFrequencies();
+    final nonFavorited = allItems.keys
+        .where((name) => !_favorites
+            .any((fav) => fav.name.toLowerCase() == name.toLowerCase()))
+        .toList()
+      ..sort((a, b) => (allItems[b] ?? 0).compareTo(allItems[a] ?? 0));
+    return nonFavorited;
   }
 }

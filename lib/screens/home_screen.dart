@@ -8,8 +8,15 @@ import 'add_food_screen.dart';
 import 'manage_favorites_screen.dart';
 import '../widgets/daily_summary_widget.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _quickAddScrollController = ScrollController();
 
   void _showNutritionDetails(BuildContext context, FoodEntry entry) {
     showDialog(
@@ -240,6 +247,7 @@ class HomeScreen extends StatelessWidget {
     if (favorites.isEmpty) {
       return const SizedBox.shrink();
     }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Column(
@@ -249,24 +257,44 @@ class HomeScreen extends StatelessWidget {
             'Quick Add',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8.0,
-            runSpacing: 4.0,
-            children: favorites.map((fav) {
-              return ActionChip(
-                avatar: const Icon(Icons.flash_on, size: 16),
-                label: Text(fav.name),
-                onPressed: () {
-                  context.read<FoodProvider>().addFoodEntryFromFavorite(fav);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added ${fav.name}!')),
-                  );
-                },
-              );
-            }).toList(),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            controller: _quickAddScrollController,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: favorites.map((fav) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0, bottom: 4.0),
+                  child: ActionChip(
+                    avatar: const Icon(Icons.flash_on, size: 16),
+                    label: Text(fav.name),
+                    onPressed: () {
+                      context
+                          .read<FoodProvider>()
+                          .addFoodEntryFromFavorite(fav);
+                      context.read<FoodProvider>().moveFavoriteToStart(fav.id);
+                      // Scroll to the start after the widget rebuilds
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (_quickAddScrollController.hasClients) {
+                          _quickAddScrollController.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Added ${fav.name}!')),
+                      );
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
           ),
-          const Divider(height: 16),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -306,5 +334,11 @@ class HomeScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _quickAddScrollController.dispose();
+    super.dispose();
   }
 }

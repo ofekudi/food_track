@@ -151,6 +151,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   return TextFormField(
                     controller: textEditingController,
                     focusNode: focusNode,
+                    autofocus: !_isEditingFavorite && !_isEditingEntry,
                     decoration: const InputDecoration(
                       labelText: 'Food Name *',
                       border: OutlineInputBorder(),
@@ -359,45 +360,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   ),
                 ),
               ),
-              if (!_isEditing)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0),
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.favorite_border, size: 18),
-                    label: const Text('Save as Favorite'),
-                    onPressed: () {
-                      if (_selectedFoodName.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Please enter a food name to save as favorite.')),
-                        );
-                        return;
-                      }
-                      context.read<FoodProvider>().addFavorite(
-                            name: _selectedFoodName,
-                            calories: _caloriesController.text.isEmpty
-                                ? 0
-                                : int.parse(_caloriesController.text),
-                            protein: _proteinController.text.isEmpty
-                                ? 0.0
-                                : double.parse(_proteinController.text),
-                            carbs: _carbsController.text.isEmpty
-                                ? 0.0
-                                : double.parse(_carbsController.text),
-                            fat: _fatController.text.isEmpty
-                                ? 0.0
-                                : double.parse(_fatController.text),
-                            mealType: _selectedMealType,
-                          );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                '${_selectedFoodName} saved as favorite!')),
-                      );
-                    },
-                  ),
-                ),
             ],
           ),
         ),
