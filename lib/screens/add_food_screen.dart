@@ -286,7 +286,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   return TextFormField(
                     controller: textEditingController,
                     focusNode: focusNode,
-                    autofocus: !_isEditingFavorite && !_isEditingEntry,
+                    autofocus: false,
                     decoration: const InputDecoration(
                       labelText: 'Food Name *',
                       border: OutlineInputBorder(),
