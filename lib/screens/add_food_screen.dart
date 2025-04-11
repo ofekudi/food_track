@@ -191,6 +191,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
           if (confirmed == true) {
             final forceStatus = await addAction(force: true);
+
             if (mounted) {
               if (forceStatus == AddEntryStatus.Added) {
                 Navigator.pop(context);

@@ -349,4 +349,21 @@ class DBHelper {
 
     return results.map((row) => row['name'] as String).toList();
   }
+
+  Future<List<Map<String, dynamic>>> getUniqueFoodItems() async {
+    final db = await database;
+    // Select the most recent data for each unique food name
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+      SELECT name, calories, protein, carbs, fat, meal_type
+      FROM (
+        SELECT
+          name, calories, protein, carbs, fat, meal_type,
+          ROW_NUMBER() OVER(PARTITION BY name ORDER BY created_at DESC) as rn
+        FROM food_entries
+      )
+      WHERE rn = 1
+      ORDER BY name ASC;
+    ''');
+    return results;
+  }
 }

@@ -8,6 +8,7 @@ class FoodProvider with ChangeNotifier {
   final DBHelper _dbHelper = DBHelper();
   List<FoodEntry> _foodEntries = [];
   List<FavoriteItem> _favorites = [];
+  List<Map<String, dynamic>> _uniqueFoodItems = [];
   DateTime _selectedDate = DateTime.now();
   Map<String, dynamic>? _dailySummary;
   Map<String, int> _mealTypeCounts = {
@@ -26,14 +27,16 @@ class FoodProvider with ChangeNotifier {
   Map<String, int> get mealTypeCounts => _mealTypeCounts;
   List<FavoriteItem> get favorites => _favorites;
   DateTime get selectedDate => _selectedDate;
+  List<Map<String, dynamic>> get uniqueFoodItems => _uniqueFoodItems;
 
   Future<void> loadFoodEntries() async {
     final entriesData = await _loadRawEntriesForDate(_selectedDate);
     _foodEntries = entriesData.map((e) => FoodEntry.fromMap(e)).toList();
 
-    _calculateMealTypeCounts(); // Calculate counts from loaded entries
-    _calculateDailySummary(); // Calculate summary from loaded entries
-    await loadFavorites(); // Load favorites
+    _calculateMealTypeCounts();
+    _calculateDailySummary();
+    await loadFavorites();
+    await loadUniqueFoodItems();
 
     notifyListeners();
 
@@ -280,5 +283,40 @@ class FoodProvider with ChangeNotifier {
             (_mealTypeCounts[entry.mealType] ?? 0) + 1;
       }
     }
+  }
+
+  Future<void> loadUniqueFoodItems() async {
+    _uniqueFoodItems = await _dbHelper.getUniqueFoodItems();
+  }
+
+  Future<AddEntryStatus> addFoodEntryFromUniqueItem(
+      Map<String, dynamic> itemData, int dailyLimit,
+      {bool forceAdd = false, DateTime? targetDate}) async {
+    final dateToAdd = targetDate ?? _selectedDate;
+    final mealType = itemData['meal_type'] as String? ?? 'Snack';
+    final name = itemData['name'] as String? ?? 'Unknown Item';
+
+    bool limitCheckApplies = dateToAdd.year == _selectedDate.year &&
+        dateToAdd.month == _selectedDate.month &&
+        dateToAdd.day == _selectedDate.day;
+
+    if (limitCheckApplies && !_checkLimit(mealType, dailyLimit) && !forceAdd) {
+      return AddEntryStatus.LimitExceeded;
+    }
+
+    final status = await addFoodEntry(
+      name: name,
+      calories: itemData['calories'] as int? ?? 0,
+      protein: (itemData['protein'] as num?)?.toDouble() ?? 0.0,
+      carbs: (itemData['carbs'] as num?)?.toDouble() ?? 0.0,
+      fat: (itemData['fat'] as num?)?.toDouble() ?? 0.0,
+      mealType: mealType,
+      notes: null,
+      entryDate: dateToAdd,
+      dailyLimit: dailyLimit,
+      forceAdd: true,
+    );
+
+    return status;
   }
 }

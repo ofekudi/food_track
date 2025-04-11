@@ -11,6 +11,7 @@ import 'manage_favorites_screen.dart';
 import '../widgets/daily_summary_widget.dart';
 import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
+import 'select_food_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -485,11 +486,11 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () {
           // Get the currently selected date from the provider
           final selectedDate = context.read<FoodProvider>().selectedDate;
+          // Navigate directly to SelectFoodScreen
           Navigator.push(
             context,
             MaterialPageRoute(
-              // Pass the selected date to AddFoodScreen
-              builder: (context) => AddFoodScreen(targetDate: selectedDate),
+              builder: (context) => SelectFoodScreen(targetDate: selectedDate),
             ),
           );
         },
