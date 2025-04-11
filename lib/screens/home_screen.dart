@@ -22,6 +22,97 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _quickAddScrollController = ScrollController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Use Future.delayed to wait 1 second before checking
+    Future.delayed(const Duration(seconds: 1), () {
+      // Check if the widget is still mounted after the delay
+      if (mounted) {
+        _checkKitchenClosed();
+      }
+    });
+  }
+
+  void _checkKitchenClosed() {
+    // Ensure the context is still mounted before proceeding
+    if (!mounted) return;
+
+    final settingsProvider =
+        Provider.of<SettingsProvider>(context, listen: false);
+
+    // Exit if the feature is not enabled
+    if (!settingsProvider.stopEatingEnabled) return;
+
+    final kitchenClosedTime = settingsProvider.kitchenClosedTime;
+    final bannerTitle =
+        settingsProvider.stopEatingTitle; // Get the selected title
+
+    // Only proceed if a kitchen closed time is set (getter handles enabled state check)
+    if (kitchenClosedTime != null) {
+      final now = TimeOfDay.now();
+
+      // Convert TimeOfDay to minutes since midnight for easy comparison
+      final nowMinutes = now.hour * 60 + now.minute;
+      final closedMinutes =
+          kitchenClosedTime.hour * 60 + kitchenClosedTime.minute;
+
+      if (nowMinutes >= closedMinutes) {
+        // Show a themed and funnier dialog
+        showDialog(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            // Get screen height for sizing
+            // final screenHeight = MediaQuery.of(dialogContext).size.height; // Height constraint removed
+
+            return AlertDialog(
+              icon: Icon(
+                Icons.bedtime_outlined, // Changed icon to bedtime
+                color: Theme.of(dialogContext).colorScheme.primary,
+                size: 40,
+              ),
+              title: Text(bannerTitle), // Use the dynamic title from settings
+              content: Text(
+                // Reverted content structure
+                "This is just a feeling.\nNot a need.", // New subtitle
+                textAlign: TextAlign.center,
+                // Apply a larger text style but ensure normal weight
+                style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                      fontWeight:
+                          FontWeight.normal, // Explicitly set normal weight
+                    ),
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: <Widget>[
+                TextButton(
+                  child: Text(
+                    "Got It",
+                    style: TextStyle(
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                      // Apply a larger text style for the button
+                      fontSize: Theme.of(dialogContext)
+                              .textTheme
+                              .labelLarge
+                              ?.fontSize ??
+                          16.0,
+                      fontWeight: FontWeight.bold, // Make it bolder too
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close the dialog
+                  },
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+            );
+          },
+        );
+      }
+    }
+  }
+
   void _showNutritionDetails(BuildContext context, FoodEntry entry) {
     showDialog(
       context: context,
