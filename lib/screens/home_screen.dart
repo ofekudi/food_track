@@ -8,6 +8,7 @@ import 'add_food_screen.dart';
 import 'manage_favorites_screen.dart';
 import '../widgets/daily_summary_widget.dart';
 import 'meal_analytics_screen.dart';
+import 'preferences_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -186,6 +187,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(
                     builder: (context) => const MealAnalyticsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Preferences',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PreferencesScreen()),
               );
             },
           ),

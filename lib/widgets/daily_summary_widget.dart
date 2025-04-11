@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/food_provider.dart';
+import '../providers/settings_provider.dart';
 
 class DailySummaryWidget extends StatefulWidget {
   final Map<String, dynamic>? summary;
@@ -25,6 +26,8 @@ class _DailySummaryWidgetState extends State<DailySummaryWidget> {
   Widget _buildMealDistributionPage(BuildContext context) {
     // Access mealTypeCounts using Provider
     final mealTypeCounts = context.watch<FoodProvider>().mealTypeCounts;
+    // Access SettingsProvider
+    final settingsProvider = context.watch<SettingsProvider>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,29 +42,39 @@ class _DailySummaryWidgetState extends State<DailySummaryWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildMealTypeInfo(
+                context,
                 'Breakfast',
                 mealTypeCounts['Breakfast'] ?? 0,
                 Icons.breakfast_dining,
+                settingsProvider.getDailyLimitForMeal('Breakfast'),
               ),
               _buildMealTypeInfo(
+                context,
                 'Lunch',
                 mealTypeCounts['Lunch'] ?? 0,
                 Icons.lunch_dining,
+                settingsProvider.getDailyLimitForMeal('Lunch'),
               ),
               _buildMealTypeInfo(
+                context,
                 'Dinner',
                 mealTypeCounts['Dinner'] ?? 0,
                 Icons.dinner_dining,
+                settingsProvider.getDailyLimitForMeal('Dinner'),
               ),
               _buildMealTypeInfo(
+                context,
                 'Snack',
                 mealTypeCounts['Snack'] ?? 0,
                 Icons.cookie,
+                settingsProvider.getDailyLimitForMeal('Snack'),
               ),
               _buildMealTypeInfo(
+                context,
                 'Coffee',
                 mealTypeCounts['Coffee'] ?? 0,
                 Icons.coffee,
+                settingsProvider.getDailyLimitForMeal('Coffee'),
               ),
             ],
           ),
@@ -154,19 +167,48 @@ class _DailySummaryWidgetState extends State<DailySummaryWidget> {
     );
   }
 
-  Widget _buildMealTypeInfo(String label, int count, IconData icon) {
+  Widget _buildMealTypeInfo(
+      BuildContext context, String label, int count, IconData icon, int limit) {
+    Color textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    FontWeight fontWeight = FontWeight.normal;
+    Color? iconColor = Theme.of(context).iconTheme.color;
+
+    if (limit > 0) {
+      final difference = count - limit;
+      if (difference == 1) {
+        // Exceeded by 1 -> Yellow
+        textColor = Colors.yellow.shade800;
+        iconColor = Colors.yellow.shade800;
+        fontWeight = FontWeight.bold;
+      } else if (difference >= 2) {
+        // Exceeded by 2+ -> Red
+        textColor = Colors.red.shade700;
+        iconColor = Colors.red.shade700;
+        fontWeight = FontWeight.bold;
+      }
+    }
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 28),
+        Icon(icon, size: 28, color: iconColor),
         const SizedBox(height: 6),
         Text(
           '$count',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 12,
+            color: textColor.withOpacity(0.7),
+            fontWeight: fontWeight,
+          ),
         ),
       ],
     );

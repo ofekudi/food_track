@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/food_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -12,8 +13,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => FoodProvider()..loadFoodEntries(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+            create: (_) => FoodProvider()..loadFoodEntries()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
       child: MaterialApp(
         title: 'Food Track',
         theme: ThemeData(

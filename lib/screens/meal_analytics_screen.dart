@@ -129,8 +129,10 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
       if (entries.isNotEmpty) {
         final stats = _calculateStats(entries, mealType);
         final icon = mealTypeIcons[mealType] ?? Icons.restaurant;
-        final borderColor = _getMealTypeColor(mealType);
-        final cardColor = _getMealTypeColor(mealType).withOpacity(0.7);
+
+        final Color borderColor = _getMealTypeColor(mealType);
+        final Color cardColor = _getMealTypeColor(mealType).withOpacity(0.7);
+        final Color textColor = Colors.white;
 
         widgets.add(
           Card(
