@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../db_helper.dart';
 import '../models/food_entry.dart';
 import '../models/favorite_item.dart';
+import '../models/add_entry_status.dart';
 
 class FoodProvider with ChangeNotifier {
   final DBHelper _dbHelper = DBHelper();
@@ -27,15 +28,27 @@ class FoodProvider with ChangeNotifier {
   DateTime get selectedDate => _selectedDate;
 
   Future<void> loadFoodEntries() async {
-    _foodEntries = await _loadEntriesForDate(_selectedDate);
-    await loadFavorites();
-    _calculateDailySummary();
+    final entriesData = await _loadRawEntriesForDate(_selectedDate);
+    _foodEntries = entriesData.map((e) => FoodEntry.fromMap(e)).toList();
+
+    _calculateMealTypeCounts(); // Calculate counts from loaded entries
+    _calculateDailySummary(); // Calculate summary from loaded entries
+    await loadFavorites(); // Load favorites
+
     notifyListeners();
 
     // Load all entries for analytics if not already loaded
     if (!_hasLoadedAllEntries) {
-      _loadAllEntries();
+      _loadAllEntries(); // Start loading in background
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadRawEntriesForDate(
+      DateTime date) async {
+    // Only fetch raw entries from DB here
+    return await _dbHelper.getFoodEntriesForDate(date);
+    // Daily summary calculation moved to _calculateDailySummary
+    // Meal type counts calculation moved to _calculateMealTypeCounts
   }
 
   Future<void> _loadAllEntries() async {
@@ -56,7 +69,13 @@ class FoodProvider with ChangeNotifier {
     return _allFoodEntries;
   }
 
-  Future<void> addFoodEntry({
+  // Helper to check limit
+  bool _checkLimit(String mealType, int limit) {
+    if (limit <= 0) return true; // 0 or less means no limit
+    return (_mealTypeCounts[mealType] ?? 0) < limit;
+  }
+
+  Future<AddEntryStatus> addFoodEntry({
     required String name,
     required int calories,
     required double protein,
@@ -65,18 +84,37 @@ class FoodProvider with ChangeNotifier {
     required String mealType,
     String? notes,
     required DateTime entryDate,
+    required int dailyLimit,
+    bool forceAdd = false,
   }) async {
-    await _dbHelper.addFoodEntry(
-      name: name,
-      calories: calories,
-      protein: protein,
-      carbs: carbs,
-      fat: fat,
-      mealType: mealType,
-      notes: notes,
-      entryDate: entryDate,
-    );
-    await loadFoodEntries();
+    // Check limit only if entryDate is the same as selectedDate
+    if (entryDate.year == _selectedDate.year &&
+        entryDate.month == _selectedDate.month &&
+        entryDate.day == _selectedDate.day) {
+      if (!_checkLimit(mealType, dailyLimit) && !forceAdd) {
+        return AddEntryStatus.LimitExceeded;
+      }
+    }
+
+    try {
+      await _dbHelper.addFoodEntry(
+        name: name,
+        calories: calories,
+        protein: protein,
+        carbs: carbs,
+        fat: fat,
+        mealType: mealType,
+        notes: notes,
+        entryDate: entryDate,
+      );
+      await loadFoodEntries(); // Reload data after adding
+      return AddEntryStatus.Added;
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error adding food entry: $e");
+      }
+      return AddEntryStatus.Error;
+    }
   }
 
   Future<void> deleteFoodEntry(String id) async {
@@ -147,8 +185,16 @@ class FoodProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addFoodEntryFromFavorite(FavoriteItem favorite) async {
-    await addFoodEntry(
+  Future<AddEntryStatus> addFoodEntryFromFavorite(
+      FavoriteItem favorite, int dailyLimit,
+      {bool forceAdd = false}) async {
+    // Check limit first
+    if (!_checkLimit(favorite.mealType, dailyLimit) && !forceAdd) {
+      return AddEntryStatus.LimitExceeded;
+    }
+
+    // Proceed to add if limit is okay or forced
+    final status = await addFoodEntry(
       name: favorite.name,
       calories: favorite.calories,
       protein: favorite.protein,
@@ -157,9 +203,15 @@ class FoodProvider with ChangeNotifier {
       mealType: favorite.mealType,
       notes: null,
       entryDate: _selectedDate,
+      dailyLimit: dailyLimit, // Pass limit (though already checked)
+      forceAdd: true, // Force add here as we already checked the limit
     );
-    // Move the used favorite to the start
-    await moveFavoriteToStart(favorite.id);
+
+    if (status == AddEntryStatus.Added) {
+      // Move the used favorite to the start only if added successfully
+      await moveFavoriteToStart(favorite.id);
+    }
+    return status;
   }
 
   // Get sorted food suggestions based on frequency
@@ -213,10 +265,20 @@ class FoodProvider with ChangeNotifier {
     };
   }
 
-  Future<List<FoodEntry>> _loadEntriesForDate(DateTime date) async {
-    final entries = await _dbHelper.getFoodEntriesForDate(date);
-    _dailySummary = await _dbHelper.getDailySummary(date);
-    _mealTypeCounts = await _dbHelper.getMealTypeCounts(date);
-    return entries.map((e) => FoodEntry.fromMap(e)).toList();
+  // New method to calculate meal counts from the loaded list
+  void _calculateMealTypeCounts() {
+    _mealTypeCounts = {
+      'Breakfast': 0,
+      'Lunch': 0,
+      'Dinner': 0,
+      'Snack': 0,
+      'Coffee': 0,
+    };
+    for (var entry in _foodEntries) {
+      if (_mealTypeCounts.containsKey(entry.mealType)) {
+        _mealTypeCounts[entry.mealType] =
+            (_mealTypeCounts[entry.mealType] ?? 0) + 1;
+      }
+    }
   }
 }

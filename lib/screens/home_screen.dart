@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/food_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/food_entry.dart';
 import '../models/favorite_item.dart';
+import '../models/add_entry_status.dart';
 import 'add_food_screen.dart';
 import 'manage_favorites_screen.dart';
 import '../widgets/daily_summary_widget.dart';
@@ -157,6 +159,87 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _handleAddFromFavorite(
+      BuildContext context, FavoriteItem fav) async {
+    final foodProvider = context.read<FoodProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final limit = settingsProvider.getDailyLimitForMeal(fav.mealType);
+
+    final status = await foodProvider.addFoodEntryFromFavorite(fav, limit);
+
+    if (!mounted) return;
+
+    switch (status) {
+      case AddEntryStatus.Added:
+        _handleSuccessfulAdd(context, fav.name);
+        break;
+      case AddEntryStatus.LimitExceeded:
+        _showLimitExceededDialog(context, fav, limit);
+        break;
+      case AddEntryStatus.Error:
+        _showErrorSnackbar(context, fav.name);
+        break;
+    }
+  }
+
+  Future<void> _showLimitExceededDialog(
+      BuildContext context, FavoriteItem fav, int limit) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Daily Limit Reached'),
+        content: Text(
+            'You\'ve reached your daily limit of $limit for ${fav.mealType}. Add "${fav.name}" anyway?'),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Add Anyway'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final foodProvider = context.read<FoodProvider>();
+      final status = await foodProvider.addFoodEntryFromFavorite(fav, limit,
+          forceAdd: true);
+
+      if (!mounted) return;
+
+      if (status == AddEntryStatus.Added) {
+        _handleSuccessfulAdd(context, fav.name);
+      } else {
+        _showErrorSnackbar(context, fav.name);
+      }
+    }
+  }
+
+  void _handleSuccessfulAdd(BuildContext context, String itemName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added $itemName!')),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_quickAddScrollController.hasClients) {
+        _quickAddScrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _showErrorSnackbar(BuildContext context, String itemName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error adding $itemName. Please try again.')),
     );
   }
 
@@ -350,25 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ActionChip(
                     avatar: const Icon(Icons.flash_on, size: 16),
                     label: Text(fav.name),
-                    onPressed: () {
-                      context
-                          .read<FoodProvider>()
-                          .addFoodEntryFromFavorite(fav);
-                      context.read<FoodProvider>().moveFavoriteToStart(fav.id);
-                      // Scroll to the start after the widget rebuilds
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_quickAddScrollController.hasClients) {
-                          _quickAddScrollController.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                          );
-                        }
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Added ${fav.name}!')),
-                      );
-                    },
+                    onPressed: () => _handleAddFromFavorite(context, fav),
                   ),
                 );
               }).toList(),
