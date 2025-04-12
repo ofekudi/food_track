@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../providers/food_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/favorite_item.dart';
@@ -9,15 +10,20 @@ import '../models/add_entry_status.dart';
 class AddFoodScreen extends StatefulWidget {
   final FavoriteItem? favoriteToEdit;
   final FoodEntry? entryToEdit;
+  final Map<String, dynamic>? itemDataToEdit;
   final DateTime targetDate;
 
   const AddFoodScreen({
     super.key,
     this.favoriteToEdit,
     this.entryToEdit,
+    this.itemDataToEdit,
     required this.targetDate,
-  }) : assert(favoriteToEdit == null || entryToEdit == null,
-            'Cannot edit both a favorite and an entry at the same time');
+  }) : assert(
+            favoriteToEdit == null ||
+                entryToEdit == null ||
+                itemDataToEdit == null,
+            'Cannot edit multiple item types at the same time');
 
   @override
   State<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -37,7 +43,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
   bool get _isEditingFavorite => widget.favoriteToEdit != null;
   bool get _isEditingEntry => widget.entryToEdit != null;
-  bool get _isEditing => _isEditingFavorite || _isEditingEntry;
+  bool get _isEditingUniqueItem => widget.itemDataToEdit != null;
+  bool get _isEditing =>
+      _isEditingFavorite || _isEditingEntry || _isEditingUniqueItem;
 
   final List<String> _mealTypes = [
     'Breakfast',
@@ -68,6 +76,17 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       _fatController.text = entry.fat.toString();
       _notesController.text = entry.notes ?? '';
       _selectedMealType = entry.mealType;
+    } else if (_isEditingUniqueItem) {
+      final item = widget.itemDataToEdit!;
+      _selectedFoodName = item['name'] as String? ?? '';
+      _caloriesController.text = (item['calories'] as int? ?? 0).toString();
+      _proteinController.text =
+          ((item['protein'] as num?)?.toDouble() ?? 0.0).toString();
+      _carbsController.text =
+          ((item['carbs'] as num?)?.toDouble() ?? 0.0).toString();
+      _fatController.text =
+          ((item['fat'] as num?)?.toDouble() ?? 0.0).toString();
+      _selectedMealType = item['meal_type'] as String? ?? 'Snack';
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _nameFocusNode.requestFocus();
@@ -144,6 +163,43 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           );
           Navigator.pop(context);
         }
+      } else if (_isEditingUniqueItem) {
+        final originalName = widget.itemDataToEdit!['name'] as String;
+
+        await foodProvider.deleteAllEntriesByName(originalName);
+
+        final limit = settingsProvider.getDailyLimitForMeal(_selectedMealType);
+        final addStatus = await foodProvider.addFoodEntry(
+          name: name,
+          calories: calories,
+          protein: protein,
+          carbs: carbs,
+          fat: fat,
+          mealType: _selectedMealType,
+          notes: notes,
+          entryDate: widget.targetDate,
+          dailyLimit: limit,
+          forceAdd: false,
+        );
+
+        if (mounted) {
+          if (addStatus == AddEntryStatus.Added) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Item "$name" updated.')),
+            );
+            Navigator.pop(context);
+          } else if (addStatus == AddEntryStatus.LimitExceeded) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(
+                      'Update failed: Daily limit reached for $_selectedMealType on ${DateFormat.yMd().format(widget.targetDate)}.')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error updating item "$name".')),
+            );
+          }
+        }
       } else {
         final limit = settingsProvider.getDailyLimitForMeal(_selectedMealType);
 
@@ -167,7 +223,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         if (!mounted) return;
 
         if (initialStatus == AddEntryStatus.Added) {
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else if (initialStatus == AddEntryStatus.LimitExceeded) {
           final confirmed = await showDialog<bool>(
             context: context,
@@ -194,7 +250,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
             if (mounted) {
               if (forceStatus == AddEntryStatus.Added) {
-                Navigator.pop(context);
+                Navigator.pop(context, true);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -219,6 +275,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       title = 'Edit Favorite';
     } else if (_isEditingEntry) {
       title = 'Edit Entry';
+    } else if (_isEditingUniqueItem) {
+      title = 'Edit Item';
     } else {
       title = 'Add Food Entry';
     }
@@ -227,15 +285,29 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       appBar: AppBar(
         title: Text(title),
         actions: [
-          TextButton(
-            onPressed: _submitForm,
-            child: const Text(
-              'Add',
-              style: TextStyle(
-                color: Colors.white,
+          if (_isEditing)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: TextButton(
+                onPressed: _submitForm,
+                child: const Text(
+                  'Save',
+                  style: TextStyle(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _submitForm,
+              child: const Text(
+                'Add',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: SingleChildScrollView(

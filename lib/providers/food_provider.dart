@@ -319,4 +319,14 @@ class FoodProvider with ChangeNotifier {
 
     return status;
   }
+
+  // New method to delete all entries by name
+  Future<int> deleteAllEntriesByName(String name) async {
+    final count = await _dbHelper.deleteAllEntriesByName(name);
+    if (count > 0) {
+      // Reload data to reflect changes
+      await loadFoodEntries(); // This also reloads unique items
+    }
+    return count;
+  }
 }

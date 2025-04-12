@@ -366,4 +366,17 @@ class DBHelper {
     ''');
     return results;
   }
+
+  Future<int> deleteAllEntriesByName(String name) async {
+    final db = await database;
+    // Delete all entries matching the name
+    int count = await db.delete(
+      'food_entries',
+      where: 'name = ?',
+      whereArgs: [name],
+    );
+    // Note: This doesn't automatically update daily summaries for all potentially affected dates.
+    // A more complex implementation would be needed to recalculate summaries if required.
+    return count;
+  }
 }

@@ -18,6 +18,7 @@ class SelectFoodScreen extends StatefulWidget {
 class _SelectFoodScreenState extends State<SelectFoodScreen> {
   String _searchTerm = '';
   List<Map<String, dynamic>> _filteredItems = [];
+  late Offset _tapPosition; // Store tap position for the menu
 
   @override
   void initState() {
@@ -181,17 +182,20 @@ class _SelectFoodScreenState extends State<SelectFoodScreen> {
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(40), // Make button wider
                 foregroundColor: Theme.of(context).colorScheme.primary,
-                side: BorderSide(color: Theme.of(context).colorScheme.primary),
               ),
-              onPressed: () {
+              onPressed: () async {
                 // Navigate to AddFoodScreen
-                Navigator.push(
+                final result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
                         AddFoodScreen(targetDate: widget.targetDate),
                   ),
                 );
+                // If AddFoodScreen popped with true (meaning success), pop this screen too
+                if (result == true && mounted) {
+                  Navigator.pop(context);
+                }
               },
             ),
           ),
@@ -215,11 +219,105 @@ class _SelectFoodScreenState extends State<SelectFoodScreen> {
                       final fat = (item['fat'] as num?)?.toDouble() ?? 0.0;
                       final mealType = item['meal_type'] as String? ?? 'N/A';
 
-                      return ListTile(
-                        title: Text(name),
-                        subtitle: null,
-                        trailing: const Icon(Icons.add_circle_outline),
-                        onTap: () => _selectItem(context, item),
+                      final foodProvider = context.read<FoodProvider>();
+
+                      return GestureDetector(
+                        onTapDown: (details) {
+                          _tapPosition = details.globalPosition;
+                        },
+                        onLongPress: () {
+                          final RenderBox overlay = Overlay.of(context)
+                              .context
+                              .findRenderObject()! as RenderBox;
+                          showMenu(
+                            context: context,
+                            position: RelativeRect.fromRect(
+                                _tapPosition &
+                                    const Size(
+                                        40, 40), // Small rect at tap position
+                                Offset.zero &
+                                    overlay.size // Bigger rect entire screen
+                                ),
+                            items: <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: ListTile(
+                                    leading: Icon(Icons.edit_outlined),
+                                    title: Text('Edit')),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: ListTile(
+                                    leading: Icon(Icons.delete_forever_outlined,
+                                        color: Colors.redAccent),
+                                    title: Text('Delete All Entries',
+                                        style: TextStyle(
+                                            color: Colors.redAccent))),
+                              ),
+                            ],
+                            elevation: 8.0,
+                          ).then<void>((String? newValue) {
+                            if (newValue == null)
+                              return; // Return if menu dismissed
+
+                            if (newValue == 'edit') {
+                              // Navigate to AddFoodScreen for editing
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddFoodScreen(
+                                    targetDate: widget.targetDate,
+                                    itemDataToEdit: item,
+                                  ),
+                                ),
+                              );
+                            } else if (newValue == 'delete') {
+                              // Show delete confirmation dialog
+                              showDialog(
+                                context: context,
+                                builder: (dialogCtx) => AlertDialog(
+                                  title: Text('Delete All "$name"?'),
+                                  content: const Text(
+                                      'This will delete ALL past entries for this food item. This action cannot be undone.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(dialogCtx).pop(),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        Navigator.of(dialogCtx)
+                                            .pop(); // Close dialog
+                                        final count = await foodProvider
+                                            .deleteAllEntriesByName(name);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text(
+                                                    'Deleted $count entries for "$name".')),
+                                          );
+                                        }
+                                      },
+                                      child: const Text('Delete All',
+                                          style: TextStyle(
+                                              color: Colors.redAccent)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          });
+                        },
+                        // The actual ListTile
+                        child: ListTile(
+                          title: Text(name),
+                          subtitle: null,
+                          trailing: const Icon(Icons.add_circle_outline),
+                          onTap: () => _selectItem(context, item),
+                          // Long press handled by GestureDetector
+                        ),
                       );
                     },
                   ),
