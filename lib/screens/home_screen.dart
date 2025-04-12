@@ -344,17 +344,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Food Track'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite_border),
-            tooltip: 'Manage Favorites',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const ManageFavoritesScreen()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Meal Analytics',
             onPressed: () {

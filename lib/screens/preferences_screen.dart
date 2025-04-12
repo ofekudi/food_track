@@ -3,6 +3,7 @@ import 'package:provider/provider.dart'; // Import Provider
 import '../providers/settings_provider.dart'; // Import SettingsProvider
 import 'daily_limit_screen.dart';
 import 'stop_eating_settings_screen.dart'; // Import the new screen
+import 'manage_favorites_screen.dart'; // Import the favorites screen
 
 class PreferencesScreen extends StatelessWidget {
   const PreferencesScreen({super.key});
@@ -31,6 +32,21 @@ class PreferencesScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const DailyLimitScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('Manage Favorites'),
+                subtitle:
+                    const Text('Add, edit, or remove favorite food items'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ManageFavoritesScreen(),
                     ),
                   );
                 },
