@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../db_helper.dart';
+import '../constants/strings.dart';
+import '../constants/theme.dart';
 
 class MealAnalyticsScreen extends StatefulWidget {
   const MealAnalyticsScreen({super.key});
@@ -79,7 +81,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Weekly Insights'),
+        title: const Text(AppStrings.weeklyInsights),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -95,9 +97,9 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
               _loadData();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 7, child: Text('Last 7 days')),
-              const PopupMenuItem(value: 14, child: Text('Last 14 days')),
-              const PopupMenuItem(value: 30, child: Text('Last 30 days')),
+              const PopupMenuItem(value: 7, child: Text(AppStrings.last7Days)),
+              const PopupMenuItem(value: 14, child: Text(AppStrings.last14Days)),
+              const PopupMenuItem(value: 30, child: Text(AppStrings.last30Days)),
             ],
           ),
         ],
@@ -137,12 +139,12 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No data for this period',
+            AppStrings.noDataTitle,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Start logging your meals to see insights',
+            AppStrings.noDataSubtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -157,7 +159,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
       children: [
         Expanded(
           child: _buildSummaryCard(
-            'Total Entries',
+            AppStrings.totalEntries,
             '$_totalEntries',
             Icons.restaurant_menu,
             Theme.of(context).colorScheme.primary,
@@ -166,7 +168,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _buildSummaryCard(
-            'Avg Hunger',
+            AppStrings.avgHunger,
             _averageHunger.toStringAsFixed(1),
             Icons.show_chart,
             Colors.blue,
@@ -175,7 +177,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _buildSummaryCard(
-            'Late Night',
+            AppStrings.lateNight,
             '$_lateNightCount',
             Icons.nightlight,
             Colors.purple,
@@ -216,6 +218,13 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
     final total = _reasonCounts.values.fold<int>(0, (sum, v) => sum + v);
     if (total == 0) return const SizedBox.shrink();
 
+    final reasonLabels = {
+      'hungry': AppStrings.reasonHungry,
+      'bored': AppStrings.reasonBored,
+      'craving': AppStrings.reasonCraving,
+      'social': AppStrings.reasonSocial,
+    };
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -227,7 +236,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 const Icon(Icons.pie_chart),
                 const SizedBox(width: 8),
                 Text(
-                  'Why You Eat',
+                  AppStrings.whyYouEat,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -246,12 +255,37 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildReasonLegend(total),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: _reasonCounts.entries.map((entry) {
+                final count = entry.value;
+                final percentage = total > 0 ? (count / total * 100).round() : 0;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: AppTheme.reasonColors[entry.key],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${reasonLabels[entry.key]}: $count ($percentage%)',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
             if (_lowMindfulCount > 0) ...[
               const Divider(height: 24),
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.lightbulb_outline,
                     color: Colors.orange,
                     size: 20,
@@ -273,19 +307,12 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   }
 
   List<PieChartSectionData> _buildReasonPieSections(int total) {
-    final colors = {
-      'hungry': Colors.green,
-      'bored': Colors.orange,
-      'craving': Colors.pink,
-      'social': Colors.blue,
-    };
-
     return _reasonCounts.entries.where((e) => e.value > 0).map((entry) {
       final percentage = (entry.value / total * 100).round();
       return PieChartSectionData(
         value: entry.value.toDouble(),
         title: '$percentage%',
-        color: colors[entry.key] ?? Colors.grey,
+        color: AppTheme.reasonColors[entry.key] ?? Colors.grey,
         radius: 60,
         titleStyle: const TextStyle(
           fontSize: 12,
@@ -294,48 +321,6 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         ),
       );
     }).toList();
-  }
-
-  Widget _buildReasonLegend(int total) {
-    final labels = {
-      'hungry': 'Hungry',
-      'bored': 'Bored',
-      'craving': 'Craving',
-      'social': 'Social',
-    };
-    final colors = {
-      'hungry': Colors.green,
-      'bored': Colors.orange,
-      'craving': Colors.pink,
-      'social': Colors.blue,
-    };
-
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      children: _reasonCounts.entries.map((entry) {
-        final count = entry.value;
-        final percentage = total > 0 ? (count / total * 100).round() : 0;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: colors[entry.key],
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${labels[entry.key]}: $count ($percentage%)',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        );
-      }).toList(),
-    );
   }
 
   Widget _buildHungerPatternsSection() {
@@ -356,7 +341,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 const Icon(Icons.show_chart),
                 const SizedBox(width: 8),
                 Text(
-                  'Hunger Patterns',
+                  AppStrings.hungerPatterns,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -398,7 +383,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                       barRods: [
                         BarChartRodData(
                           toY: count.toDouble(),
-                          color: _getHungerColor(level),
+                          color: AppTheme.hungerColor(level),
                           width: 32,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                         ),
@@ -428,7 +413,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '$lowHungerPercent% of eating happened at low hunger (1-2)',
+                    '$lowHungerPercent${AppStrings.lowHungerWarning}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -438,23 +423,6 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         ),
       ),
     );
-  }
-
-  Color _getHungerColor(int level) {
-    switch (level) {
-      case 1:
-        return Colors.red.shade300;
-      case 2:
-        return Colors.orange.shade300;
-      case 3:
-        return Colors.yellow.shade600;
-      case 4:
-        return Colors.lightGreen.shade400;
-      case 5:
-        return Colors.green.shade500;
-      default:
-        return Colors.grey;
-    }
   }
 
   Widget _buildTimePatternsSection() {
@@ -474,7 +442,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 const Icon(Icons.schedule),
                 const SizedBox(width: 8),
                 Text(
-                  'When You Eat',
+                  AppStrings.whenYouEat,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -484,7 +452,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
             const SizedBox(height: 16),
             if (peakHours.isNotEmpty) ...[
               Text(
-                'Peak eating times:',
+                AppStrings.peakEatingTimes,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),
@@ -511,14 +479,13 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   }
 
   Widget _buildWeekdayChart() {
-    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final maxValue = _weekdayDistribution.values.fold<int>(0, (max, v) => v > max ? v : max);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'By day of week:',
+          AppStrings.byDayOfWeek,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
@@ -550,7 +517,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  weekdays[index],
+                  AppStrings.weekdays[index],
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
                 Text(

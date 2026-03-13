@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
+import '../constants/strings.dart';
 
 class StopEatingSettingsScreen extends StatefulWidget {
   const StopEatingSettingsScreen({super.key});
@@ -62,7 +63,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
                   },
                 ),
                 TextButton(
-                  child: const Text('Save'),
+                  child: const Text(AppStrings.save),
                   onPressed: () {
                     if (currentSelection != null) {
                       settingsProvider.setStopEatingTitle(currentSelection!);
@@ -86,17 +87,17 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
         final selectedTime = settings.kitchenClosedTime;
         final selectedTitle = settings.stopEatingTitle;
         final formattedTime =
-            selectedTime != null ? selectedTime.format(context) : 'Not set';
+            selectedTime != null ? selectedTime.format(context) : AppStrings.notSet;
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Kitchen Closed'),
+            title: const Text(AppStrings.kitchenClosed),
           ),
           body: ListView(
             children: [
               SwitchListTile(
-                title: const Text('Enabled'),
-                subtitle: const Text('Show reminder after this time'),
+                title: const Text(AppStrings.enabled),
+                subtitle: const Text(AppStrings.showReminderSubtitle),
                 value: isEnabled,
                 onChanged: (bool value) async {
                   await settings.setStopEatingEnabled(value);
@@ -110,7 +111,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.access_time),
-                title: const Text('Time'),
+                title: const Text(AppStrings.time),
                 subtitle: Text(formattedTime),
                 enabled: isEnabled,
                 onTap: isEnabled ? () => _selectStopTime(context) : null,
@@ -118,7 +119,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.title),
-                title: const Text('Reminder Title'),
+                title: const Text(AppStrings.reminderTitle),
                 subtitle: Text(selectedTitle),
                 enabled: isEnabled,
                 onTap: isEnabled
@@ -129,7 +130,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  'When enabled, a gentle reminder will appear if you open the app after the set time, asking if you\'re truly hungry or just snacking out of habit.',
+                  AppStrings.kitchenClosedDescription,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),

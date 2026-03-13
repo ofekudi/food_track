@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/eating_provider.dart';
 import '../models/eating_log.dart';
+import '../constants/strings.dart';
+import '../widgets/hunger_indicator.dart';
+import '../widgets/reason_chip.dart';
+import '../widgets/suggestion_tile.dart';
 
 class AddEntryScreen extends StatefulWidget {
   final DateTime targetDate;
@@ -34,7 +38,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       _selectedHunger = entry.hungerLevel;
       _selectedReason = entry.reason;
       _descriptionController.text = entry.description;
-      _currentStep = 2; // Go straight to description for editing
+      _currentStep = 2;
     }
   }
 
@@ -54,7 +58,6 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   void _onReasonSelected(EatingReason reason) {
     setState(() {
       _selectedReason = reason;
-      // Check if intervention should be shown
       if (_selectedHunger != null && _selectedHunger! <= 2 && reason == EatingReason.bored) {
         _showIntervention = true;
       } else {
@@ -110,7 +113,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Entry' : 'Log Eating'),
+        title: Text(_isEditing ? AppStrings.editEntry : AppStrings.logEating),
       ),
       body: _showIntervention
           ? _buildInterventionScreen()
@@ -139,13 +142,13 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         children: [
           const SizedBox(height: 32),
           Text(
-            'How hungry are you?',
+            AppStrings.hungerQuestion,
             style: Theme.of(context).textTheme.headlineMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Text(
-            'Tap a number from 1 (not hungry) to 5 (very hungry)',
+            AppStrings.hungerHint,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -156,69 +159,33 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(5, (index) {
               final level = index + 1;
-              final isSelected = _selectedHunger == level;
-              return _buildHungerButton(level, isSelected);
+              return HungerButton(
+                level: level,
+                isSelected: _selectedHunger == level,
+                onTap: () => _onHungerSelected(level),
+              );
             }),
           ),
           const SizedBox(height: 48),
-          _buildHungerLabels(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                AppStrings.notHungry,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              Text(
+                AppStrings.veryHungry,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildHungerButton(int level, bool isSelected) {
-    return GestureDetector(
-      onTap: () => _onHungerSelected(level),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outline,
-            width: 2,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            '$level',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHungerLabels() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Not hungry',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        Text(
-          'Very hungry',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ],
     );
   }
 
@@ -230,7 +197,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         children: [
           const SizedBox(height: 32),
           Text(
-            'Why are you eating?',
+            AppStrings.reasonQuestion,
             style: Theme.of(context).textTheme.headlineMedium,
             textAlign: TextAlign.center,
           ),
@@ -240,7 +207,11 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             spacing: 16,
             runSpacing: 16,
             children: EatingReason.values.map((reason) {
-              return _buildReasonChip(reason);
+              return ReasonChip(
+                reason: reason,
+                isSelected: _selectedReason == reason,
+                onTap: () => _onReasonSelected(reason),
+              );
             }).toList(),
           ),
           const Spacer(),
@@ -251,53 +222,10 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               });
             },
             icon: const Icon(Icons.arrow_back),
-            label: const Text('Back to hunger'),
+            label: const Text(AppStrings.backToHunger),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildReasonChip(EatingReason reason) {
-    final isSelected = _selectedReason == reason;
-    final IconData icon;
-    switch (reason) {
-      case EatingReason.hungry:
-        icon = Icons.restaurant;
-        break;
-      case EatingReason.bored:
-        icon = Icons.mood_bad;
-        break;
-      case EatingReason.craving:
-        icon = Icons.favorite;
-        break;
-      case EatingReason.social:
-        icon = Icons.people;
-        break;
-    }
-
-    return ActionChip(
-      avatar: Icon(
-        icon,
-        size: 20,
-        color: isSelected
-            ? Theme.of(context).colorScheme.onPrimary
-            : Theme.of(context).colorScheme.primary,
-      ),
-      label: Text(
-        reason.displayName,
-        style: TextStyle(
-          fontSize: 16,
-          color: isSelected
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      backgroundColor: isSelected
-          ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).colorScheme.surfaceContainerHighest,
-      onPressed: () => _onReasonSelected(reason),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     );
   }
 
@@ -314,48 +242,29 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Not very hungry?',
+            AppStrings.interventionTitle,
             style: Theme.of(context).textTheme.headlineMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Text(
-            "That's okay! Here are some alternatives you might try:",
+            AppStrings.interventionSubtitle,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          _buildSuggestionTile(Icons.water_drop, 'Drink a glass of water'),
-          _buildSuggestionTile(Icons.timer, 'Wait 10 minutes'),
-          _buildSuggestionTile(Icons.directions_walk, 'Take a short walk'),
-          _buildSuggestionTile(Icons.air, 'Take 3 deep breaths'),
+          const SuggestionsList(),
           const SizedBox(height: 48),
           FilledButton(
             onPressed: _onProceedAnyway,
-            child: const Text('Log anyway'),
+            child: const Text(AppStrings.logAnyway),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: _onDismissIntervention,
-            child: const Text('Maybe later'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSuggestionTile(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 16),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge,
+            child: const Text(AppStrings.maybeLater),
           ),
         ],
       ),
@@ -370,13 +279,13 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         children: [
           const SizedBox(height: 32),
           Text(
-            'What are you eating?',
+            AppStrings.descriptionQuestion,
             style: Theme.of(context).textTheme.headlineMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Just a simple description is fine',
+            AppStrings.descriptionHint,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -386,7 +295,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
           TextField(
             controller: _descriptionController,
             decoration: InputDecoration(
-              hintText: 'e.g., "3 schnitzels" or "handful of chips"',
+              hintText: AppStrings.descriptionPlaceholder,
               border: const OutlineInputBorder(),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -394,9 +303,9 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             textCapitalization: TextCapitalization.sentences,
             maxLines: 2,
             autofocus: true,
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          // Show current selections
           if (_selectedHunger != null && _selectedReason != null)
             Card(
               child: Padding(
@@ -407,7 +316,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                     Column(
                       children: [
                         Text(
-                          'Hunger',
+                          AppStrings.hunger,
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
                         const SizedBox(height: 4),
@@ -425,7 +334,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                     Column(
                       children: [
                         Text(
-                          'Reason',
+                          AppStrings.reason,
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
                         const SizedBox(height: 4),
@@ -448,14 +357,14 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                 });
               },
               icon: const Icon(Icons.arrow_back),
-              label: const Text('Back'),
+              label: const Text(AppStrings.back),
             ),
           const SizedBox(height: 8),
           FilledButton(
             onPressed: _descriptionController.text.trim().isNotEmpty
                 ? _submitEntry
                 : null,
-            child: Text(_isEditing ? 'Save' : 'Done'),
+            child: Text(_isEditing ? AppStrings.save : AppStrings.done),
           ),
         ],
       ),

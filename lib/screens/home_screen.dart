@@ -4,6 +4,10 @@ import 'package:intl/intl.dart';
 import '../providers/eating_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/eating_log.dart';
+import '../constants/strings.dart';
+import '../widgets/hunger_indicator.dart';
+import '../widgets/reason_chip.dart';
+import '../widgets/suggestion_tile.dart';
 import 'add_entry_screen.dart';
 import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
@@ -19,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Check kitchen closed after a delay
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         _checkKitchenClosed();
@@ -60,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           title: Text(title),
           content: const Text(
-            "Are you hungry or just looking for a snack?",
+            AppStrings.kitchenClosedQuestion,
             textAlign: TextAlign.center,
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -74,7 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-                        // Navigate to add entry flow
                         final selectedDate = context.read<EatingProvider>().selectedDate;
                         Navigator.push(
                           context,
@@ -83,21 +85,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         );
                       },
-                      child: const Text('Hungry'),
+                      child: const Text(AppStrings.reasonHungry),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
                         _showBoredSuggestions();
                       },
-                      child: const Text('Bored'),
+                      child: const Text(AppStrings.reasonBored),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
                         _showBoredSuggestions();
                       },
-                      child: const Text('Habit'),
+                      child: const Text(AppStrings.habit),
                     ),
                   ],
                 ),
@@ -107,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.of(dialogContext).pop();
                   },
                   child: Text(
-                    "Got It",
+                    AppStrings.gotIt,
                     style: TextStyle(
                       color: Theme.of(dialogContext).colorScheme.primary,
                       fontWeight: FontWeight.bold,
@@ -135,23 +137,13 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Theme.of(dialogContext).colorScheme.primary,
             size: 40,
           ),
-          title: const Text("Try These Instead"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSuggestionRow(Icons.water_drop, 'Drink a glass of water'),
-              _buildSuggestionRow(Icons.timer, 'Wait 10 minutes'),
-              _buildSuggestionRow(Icons.directions_walk, 'Take a short walk'),
-              _buildSuggestionRow(Icons.air, 'Take 3 deep breaths'),
-            ],
-          ),
+          title: const Text(AppStrings.tryTheseInstead),
+          content: const SuggestionsList(compact: true),
           actionsAlignment: MainAxisAlignment.center,
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                // Navigate to add entry flow anyway
                 final selectedDate = context.read<EatingProvider>().selectedDate;
                 Navigator.push(
                   context,
@@ -160,13 +152,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
-              child: const Text('Log anyway'),
+              child: const Text(AppStrings.logAnyway),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Got It'),
+              child: const Text(AppStrings.gotIt),
             ),
           ],
           shape: RoundedRectangleBorder(
@@ -174,19 +166,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildSuggestionRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 12),
-          Text(text),
-        ],
-      ),
     );
   }
 
@@ -209,15 +188,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      _buildDetailChip(
-                        'Hunger: ${entry.hungerLevel}/5',
-                        Icons.restaurant,
+                      Chip(
+                        avatar: const Icon(Icons.restaurant, size: 16),
+                        label: Text(
+                          '${AppStrings.hunger}: ${entry.hungerLevel}/5',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        visualDensity: VisualDensity.compact,
                       ),
                       const SizedBox(width: 8),
-                      _buildDetailChip(
-                        entry.reason.displayName,
-                        _getReasonIcon(entry.reason),
-                      ),
+                      ReasonChip(reason: entry.reason, compact: true),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -233,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       ElevatedButton.icon(
                         icon: const Icon(Icons.edit, size: 18),
-                        label: const Text('Edit'),
+                        label: const Text(AppStrings.edit),
                         onPressed: () {
                           Navigator.of(ctx).pop();
                           final selectedDate = context.read<EatingProvider>().selectedDate;
@@ -250,12 +230,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                        label: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                        label: const Text(AppStrings.delete, style: TextStyle(color: Colors.redAccent)),
                         onPressed: () {
                           Navigator.of(ctx).pop();
                           context.read<EatingProvider>().deleteEatingLog(entry.id);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Entry deleted')),
+                            const SnackBar(content: Text(AppStrings.entryDeleted)),
                           );
                         },
                       ),
@@ -279,38 +259,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDetailChip(String label, IconData icon) {
-    return Chip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  IconData _getReasonIcon(EatingReason reason) {
-    switch (reason) {
-      case EatingReason.hungry:
-        return Icons.restaurant;
-      case EatingReason.bored:
-        return Icons.mood_bad;
-      case EatingReason.craving:
-        return Icons.favorite;
-      case EatingReason.social:
-        return Icons.people;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text('Mindful Eating'),
+        title: const Text(AppStrings.appName),
         actions: [
           IconButton(
             icon: const Icon(Icons.insights),
-            tooltip: 'Insights',
+            tooltip: AppStrings.weeklyInsights,
             onPressed: () {
               Navigator.push(
                 context,
@@ -320,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Preferences',
+            tooltip: AppStrings.preferences,
             onPressed: () {
               Navigator.push(
                 context,
@@ -442,14 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No entries for this day',
+              AppStrings.noEntriesTitle,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap + to log what you eat',
+              AppStrings.noEntriesSubtitle,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
@@ -468,28 +427,12 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            leading: _buildHungerIndicator(log.hungerLevel),
+            leading: HungerIndicator(level: log.hungerLevel),
             title: Text(
               log.description,
               style: const TextStyle(fontSize: 16),
             ),
-            subtitle: Row(
-              children: [
-                Icon(
-                  _getReasonIcon(log.reason),
-                  size: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  log.reason.displayName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+            subtitle: ReasonLabel(reason: log.reason),
             trailing: Text(
               DateFormat.jm().format(log.createdAt),
               style: TextStyle(
@@ -503,37 +446,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildHungerIndicator(int level) {
-    final Color color;
-    if (level <= 2) {
-      color = Colors.orange;
-    } else if (level >= 4) {
-      color = Colors.green;
-    } else {
-      color = Colors.blue;
-    }
-
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 2),
-      ),
-      child: Center(
-        child: Text(
-          '$level',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ),
     );
   }
 }
