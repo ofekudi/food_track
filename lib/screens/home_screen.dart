@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/food_provider.dart';
+import '../providers/eating_provider.dart';
 import '../providers/settings_provider.dart';
-import '../models/food_entry.dart';
-import '../models/favorite_item.dart';
-import '../models/add_entry_status.dart';
-import 'add_food_screen.dart';
-import 'manage_favorites_screen.dart';
-import '../widgets/daily_summary_widget.dart';
+import '../models/eating_log.dart';
+import 'add_entry_screen.dart';
 import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
-import 'select_food_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,14 +16,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ScrollController _quickAddScrollController = ScrollController();
-
   @override
   void initState() {
     super.initState();
-    // Use Future.delayed to wait 1 second before checking
+    // Check kitchen closed after a delay
     Future.delayed(const Duration(seconds: 1), () {
-      // Check if the widget is still mounted after the delay
       if (mounted) {
         _checkKitchenClosed();
       }
@@ -36,200 +28,234 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _checkKitchenClosed() {
-    // Ensure the context is still mounted before proceeding
     if (!mounted) return;
 
-    final settingsProvider =
-        Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
 
-    // Exit if the feature is not enabled
     if (!settingsProvider.stopEatingEnabled) return;
 
     final kitchenClosedTime = settingsProvider.kitchenClosedTime;
-    final bannerTitle =
-        settingsProvider.stopEatingTitle; // Get the selected title
+    final bannerTitle = settingsProvider.stopEatingTitle;
 
-    // Only proceed if a kitchen closed time is set (getter handles enabled state check)
     if (kitchenClosedTime != null) {
       final now = TimeOfDay.now();
-
-      // Convert TimeOfDay to minutes since midnight for easy comparison
       final nowMinutes = now.hour * 60 + now.minute;
-      final closedMinutes =
-          kitchenClosedTime.hour * 60 + kitchenClosedTime.minute;
+      final closedMinutes = kitchenClosedTime.hour * 60 + kitchenClosedTime.minute;
 
       if (nowMinutes >= closedMinutes) {
-        // Show a themed and funnier dialog
-        showDialog(
-          context: context,
-          builder: (BuildContext dialogContext) {
-            // Get screen height for sizing
-            // final screenHeight = MediaQuery.of(dialogContext).size.height; // Height constraint removed
-
-            return AlertDialog(
-              icon: Icon(
-                Icons.bedtime_outlined, // Changed icon to bedtime
-                color: Theme.of(dialogContext).colorScheme.primary,
-                size: 40,
-              ),
-              title: Text(bannerTitle), // Use the dynamic title from settings
-              content: Text(
-                // Reverted content structure
-                "This is just a feeling.\nNot a need.", // New subtitle
-                textAlign: TextAlign.center,
-                // Apply a larger text style but ensure normal weight
-                style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                      fontWeight:
-                          FontWeight.normal, // Explicitly set normal weight
-                    ),
-              ),
-              actionsAlignment: MainAxisAlignment.center,
-              actions: <Widget>[
-                TextButton(
-                  child: Text(
-                    "Got It",
-                    style: TextStyle(
-                      color: Theme.of(dialogContext).colorScheme.primary,
-                      // Apply a larger text style for the button
-                      fontSize: Theme.of(dialogContext)
-                              .textTheme
-                              .labelLarge
-                              ?.fontSize ??
-                          16.0,
-                      fontWeight: FontWeight.bold, // Make it bolder too
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Close the dialog
-                  },
-                ),
-              ],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
-              ),
-            );
-          },
-        );
+        _showKitchenClosedDialog(bannerTitle);
       }
     }
   }
 
-  void _showNutritionDetails(BuildContext context, FoodEntry entry) {
+  void _showKitchenClosedDialog(String title) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(entry.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Meal Type: ${entry.mealType}'),
-            const SizedBox(height: 8),
-            Text('Calories: ${entry.calories} kcal'),
-            const SizedBox(height: 8),
-            Text('Protein: ${entry.protein}g'),
-            const SizedBox(height: 8),
-            Text('Carbs: ${entry.carbs}g'),
-            const SizedBox(height: 8),
-            Text('Fat: ${entry.fat}g'),
-            if (entry.notes != null && entry.notes!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Notes: ${entry.notes}'),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          icon: Icon(
+            Icons.bedtime_outlined,
+            color: Theme.of(dialogContext).colorScheme.primary,
+            size: 40,
           ),
+          title: Text(title),
+          content: const Text(
+            "Are you hungry or just looking for a snack?",
+            textAlign: TextAlign.center,
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: <Widget>[
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        // Navigate to add entry flow
+                        final selectedDate = context.read<EatingProvider>().selectedDate;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddEntryScreen(targetDate: selectedDate),
+                          ),
+                        );
+                      },
+                      child: const Text('Hungry'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        _showBoredSuggestions();
+                      },
+                      child: const Text('Bored'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        _showBoredSuggestions();
+                      },
+                      child: const Text('Habit'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: Text(
+                    "Got It",
+                    style: TextStyle(
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBoredSuggestions() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          icon: Icon(
+            Icons.lightbulb_outline,
+            color: Theme.of(dialogContext).colorScheme.primary,
+            size: 40,
+          ),
+          title: const Text("Try These Instead"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSuggestionRow(Icons.water_drop, 'Drink a glass of water'),
+              _buildSuggestionRow(Icons.timer, 'Wait 10 minutes'),
+              _buildSuggestionRow(Icons.directions_walk, 'Take a short walk'),
+              _buildSuggestionRow(Icons.air, 'Take 3 deep breaths'),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Navigate to add entry flow anyway
+                final selectedDate = context.read<EatingProvider>().selectedDate;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddEntryScreen(targetDate: selectedDate),
+                  ),
+                );
+              },
+              child: const Text('Log anyway'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Got It'),
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSuggestionRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 12),
+          Text(text),
         ],
       ),
     );
   }
 
-  void _showEntryDetailsDialog(BuildContext context, FoodEntry entry) {
+  void _showEntryDetailsDialog(BuildContext context, EatingLog entry) {
     showDialog(
       context: context,
-      // barrierDismissible: false, // Prevent closing by tapping outside if needed
       builder: (ctx) => Dialog(
-        // Use Dialog for more control over padding/shape if needed, or keep AlertDialog
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  24, 48, 24, 24), // Add top padding for close button
+              padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Title --- (Moved from AlertDialog title)
-                  Text(entry.name,
-                      style: Theme.of(context).textTheme.headlineSmall),
+                  Text(
+                    entry.description,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                   const SizedBox(height: 16),
-                  // --- Content ---
-                  SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Meal Type: ${entry.mealType}'),
-                        const SizedBox(height: 8),
-                        Text('Calories: ${entry.calories} kcal'),
-                        const SizedBox(height: 8),
-                        Text('Protein: ${entry.protein}g'),
-                        const SizedBox(height: 8),
-                        Text('Carbs: ${entry.carbs}g'),
-                        const SizedBox(height: 8),
-                        Text('Fat: ${entry.fat}g'),
-                        if (entry.notes != null && entry.notes!.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Text('Notes:',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text(entry.notes!),
-                        ],
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      _buildDetailChip(
+                        'Hunger: ${entry.hungerLevel}/5',
+                        Icons.restaurant,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDetailChip(
+                        entry.reason.displayName,
+                        _getReasonIcon(entry.reason),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Logged at ${DateFormat.jm().format(entry.createdAt)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                   const SizedBox(height: 24),
-                  // --- Actions (Edit/Delete) ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Edit Button (Left)
                       ElevatedButton.icon(
                         icon: const Icon(Icons.edit, size: 18),
                         label: const Text('Edit'),
                         onPressed: () {
-                          Navigator.of(ctx).pop(); // Close dialog
-                          // Get current selected date for context
-                          final selectedDate =
-                              context.read<FoodProvider>().selectedDate;
+                          Navigator.of(ctx).pop();
+                          final selectedDate = context.read<EatingProvider>().selectedDate;
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AddFoodScreen(
-                                  entryToEdit: entry,
-                                  targetDate: selectedDate // Pass date
-                                  ),
+                              builder: (context) => AddEntryScreen(
+                                targetDate: selectedDate,
+                                entryToEdit: entry,
+                              ),
                             ),
                           );
                         },
                       ),
-                      // Delete Button (Right)
                       TextButton.icon(
-                        icon: const Icon(Icons.delete_outline,
-                            size: 18, color: Colors.redAccent),
-                        label: const Text('Delete',
-                            style: TextStyle(color: Colors.redAccent)),
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                        label: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
                         onPressed: () {
-                          // Optionally show nested confirmation here or just delete
-                          Navigator.of(ctx).pop(); // Close details dialog
-                          context
-                              .read<FoodProvider>()
-                              .deleteFoodEntry(entry.id);
+                          Navigator.of(ctx).pop();
+                          context.read<EatingProvider>().deleteEatingLog(entry.id);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('"${entry.name}" deleted.')),
+                            const SnackBar(content: Text('Entry deleted')),
                           );
                         },
                       ),
@@ -238,7 +264,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            // --- Close Button (Top Right) ---
             Positioned(
               top: 0,
               right: 0,
@@ -254,85 +279,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _handleAddFromFavorite(
-      BuildContext context, FavoriteItem fav) async {
-    final foodProvider = context.read<FoodProvider>();
-    final settingsProvider = context.read<SettingsProvider>();
-    final limit = settingsProvider.getDailyLimitForMeal(fav.mealType);
+  Widget _buildDetailChip(String label, IconData icon) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      visualDensity: VisualDensity.compact,
+    );
+  }
 
-    final status = await foodProvider.addFoodEntryFromFavorite(fav, limit);
-
-    if (!mounted) return;
-
-    switch (status) {
-      case AddEntryStatus.Added:
-        _handleSuccessfulAdd(context, fav.name);
-        break;
-      case AddEntryStatus.LimitExceeded:
-        _showLimitExceededDialog(context, fav, limit);
-        break;
-      case AddEntryStatus.Error:
-        _showErrorSnackbar(context, fav.name);
-        break;
+  IconData _getReasonIcon(EatingReason reason) {
+    switch (reason) {
+      case EatingReason.hungry:
+        return Icons.restaurant;
+      case EatingReason.bored:
+        return Icons.mood_bad;
+      case EatingReason.craving:
+        return Icons.favorite;
+      case EatingReason.social:
+        return Icons.people;
     }
-  }
-
-  Future<void> _showLimitExceededDialog(
-      BuildContext context, FavoriteItem fav, int limit) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Daily Limit Reached'),
-        content: Text(
-            'You\'ve reached your daily limit of $limit for ${fav.mealType}. Add "${fav.name}" anyway?'),
-        actionsAlignment: MainAxisAlignment.spaceBetween,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Add Anyway'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final foodProvider = context.read<FoodProvider>();
-      final status = await foodProvider.addFoodEntryFromFavorite(fav, limit,
-          forceAdd: true);
-
-      if (!mounted) return;
-
-      if (status == AddEntryStatus.Added) {
-        _handleSuccessfulAdd(context, fav.name);
-      } else {
-        _showErrorSnackbar(context, fav.name);
-      }
-    }
-  }
-
-  void _handleSuccessfulAdd(BuildContext context, String itemName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Added $itemName!')),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_quickAddScrollController.hasClients) {
-        _quickAddScrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  void _showErrorSnackbar(BuildContext context, String itemName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error adding $itemName. Please try again.')),
-    );
   }
 
   @override
@@ -341,16 +306,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text('Food Track'),
+        title: const Text('Mindful Eating'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: 'Meal Analytics',
+            icon: const Icon(Icons.insights),
+            tooltip: 'Insights',
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const MealAnalyticsScreen()),
+                MaterialPageRoute(builder: (context) => const MealAnalyticsScreen()),
               );
             },
           ),
@@ -360,126 +324,103 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const PreferencesScreen()),
+                MaterialPageRoute(builder: (context) => const PreferencesScreen()),
               );
             },
           ),
         ],
       ),
-      body: Consumer<FoodProvider>(
-        builder: (context, foodProvider, child) {
-          final selectedDate = foodProvider.selectedDate;
+      body: Consumer<EatingProvider>(
+        builder: (context, eatingProvider, child) {
+          final selectedDate = eatingProvider.selectedDate;
           final today = DateTime.now();
           final isToday = selectedDate.year == today.year &&
               selectedDate.month == today.month &&
               selectedDate.day == today.day;
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                // Always display the selected date
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0, bottom: 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios, size: 16),
-                        onPressed: () {
-                          // Navigate to previous day
-                          final prevDate =
-                              selectedDate.subtract(const Duration(days: 1));
-                          context
-                              .read<FoodProvider>()
-                              .setSelectedDate(prevDate);
-                        },
-                        tooltip: 'Previous day',
-                      ),
-                      InkWell(
-                        onTap: () async {
-                          final selectedDate = await showDatePicker(
-                            context: context,
-                            initialDate: foodProvider.selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (selectedDate != null) {
-                            await context
-                                .read<FoodProvider>()
-                                .setSelectedDate(selectedDate);
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 4.0, horizontal: 8.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                DateFormat.yMMMd().format(selectedDate),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.calendar_today,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ],
-                          ),
+          return Column(
+            children: [
+              // Date navigation
+              Padding(
+                padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios, size: 16),
+                      onPressed: () {
+                        final prevDate = selectedDate.subtract(const Duration(days: 1));
+                        context.read<EatingProvider>().setSelectedDate(prevDate);
+                      },
+                      tooltip: 'Previous day',
+                    ),
+                    InkWell(
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: eatingProvider.selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (pickedDate != null && mounted) {
+                          await context.read<EatingProvider>().setSelectedDate(pickedDate);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              DateFormat.yMMMd().format(selectedDate),
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                        // Disable the forward arrow if we're already at today
-                        onPressed: isToday
-                            ? null
-                            : () {
-                                // Navigate to next day, but not beyond today
-                                final nextDate =
-                                    selectedDate.add(const Duration(days: 1));
-                                // Make sure we don't go beyond today
-                                if (nextDate.isBefore(today) ||
-                                    nextDate.year == today.year &&
-                                        nextDate.month == today.month &&
-                                        nextDate.day == today.day) {
-                                  context
-                                      .read<FoodProvider>()
-                                      .setSelectedDate(nextDate);
-                                }
-                              },
-                        tooltip:
-                            isToday ? 'Cannot go beyond today' : 'Next day',
-                      ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onPressed: isToday
+                          ? null
+                          : () {
+                              final nextDate = selectedDate.add(const Duration(days: 1));
+                              if (nextDate.isBefore(today) ||
+                                  (nextDate.year == today.year &&
+                                      nextDate.month == today.month &&
+                                      nextDate.day == today.day)) {
+                                context.read<EatingProvider>().setSelectedDate(nextDate);
+                              }
+                            },
+                      tooltip: isToday ? 'Cannot go beyond today' : 'Next day',
+                    ),
+                  ],
                 ),
-                DailySummaryWidget(summary: foodProvider.dailySummary),
-                _buildQuickAddSection(context, foodProvider.favorites),
-                _buildFoodEntriesList(foodProvider.foodEntries),
-                const SizedBox(height: 80),
-              ],
-            ),
+              ),
+              // Entry list
+              Expanded(
+                child: _buildEatingLogsList(eatingProvider.eatingLogs),
+              ),
+            ],
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Get the currently selected date from the provider
-          final selectedDate = context.read<FoodProvider>().selectedDate;
-          // Navigate directly to SelectFoodScreen
+          final selectedDate = context.read<EatingProvider>().selectedDate;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => SelectFoodScreen(targetDate: selectedDate),
+              builder: (context) => AddEntryScreen(targetDate: selectedDate),
             ),
           );
         },
@@ -488,75 +429,76 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickAddSection(
-      BuildContext context, List<FavoriteItem> favorites) {
-    if (favorites.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick Add',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            controller: _quickAddScrollController,
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: favorites.map((fav) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0, bottom: 4.0),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.flash_on, size: 16),
-                    label: Text(fav.name),
-                    onPressed: () => _handleAddFromFavorite(context, fav),
-                  ),
-                );
-              }).toList(),
+  Widget _buildEatingLogsList(List<EatingLog> logs) {
+    if (logs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.restaurant_menu,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
             ),
-          ),
-          const SizedBox(height: 8),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFoodEntriesList(List<FoodEntry> entries) {
-    if (entries.isEmpty) {
-      return const Center(
-        child: Text('No food entries for today'),
+            const SizedBox(height: 16),
+            Text(
+              'No entries for this day',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap + to log what you eat',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+            ),
+          ],
+        ),
       );
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: entries.length,
+      padding: const EdgeInsets.only(bottom: 80),
+      itemCount: logs.length,
       itemBuilder: (context, index) {
-        final entry = entries[index];
+        final log = logs[index];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            title: Text(entry.name, style: TextStyle(fontSize: 16)),
-            subtitle: null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            leading: _buildHungerIndicator(log.hungerLevel),
+            title: Text(
+              log.description,
+              style: const TextStyle(fontSize: 16),
+            ),
+            subtitle: Row(
+              children: [
+                Icon(
+                  _getReasonIcon(log.reason),
+                  size: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  log.reason.displayName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
             trailing: Text(
-              entry.mealType,
+              DateFormat.jm().format(log.createdAt),
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             onTap: () {
-              _showEntryDetailsDialog(context, entry);
+              _showEntryDetailsDialog(context, log);
             },
           ),
         );
@@ -564,9 +506,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _quickAddScrollController.dispose();
-    super.dispose();
+  Widget _buildHungerIndicator(int level) {
+    final Color color;
+    if (level <= 2) {
+      color = Colors.orange;
+    } else if (level >= 4) {
+      color = Colors.green;
+    } else {
+      color = Colors.blue;
+    }
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Center(
+        child: Text(
+          '$level',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/food_provider.dart';
+import 'providers/eating_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/home_screen.dart';
 
@@ -16,21 +16,21 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-            create: (_) => FoodProvider()..loadFoodEntries()),
+            create: (_) => EatingProvider()..loadEatingLogs()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: MaterialApp(
-        title: 'Food Track',
+        title: 'Mindful Eating',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.green,
+            seedColor: Colors.teal,
             brightness: Brightness.light,
           ),
           useMaterial3: true,
         ),
         darkTheme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.green,
+            seedColor: Colors.teal,
             brightness: Brightness.dark,
           ),
           useMaterial3: true,

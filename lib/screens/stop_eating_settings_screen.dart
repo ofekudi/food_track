@@ -11,26 +11,22 @@ class StopEatingSettingsScreen extends StatefulWidget {
 }
 
 class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
-  // Helper function to show time picker
   Future<void> _selectStopTime(BuildContext context) async {
     final settingsProvider = context.read<SettingsProvider>();
-    // Use the stored time if available, otherwise default (e.g., 10 PM)
     final initialTime = settingsProvider.kitchenClosedTime ??
         const TimeOfDay(hour: 22, minute: 0);
 
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: initialTime,
-      helpText: 'Select Stop Eating Time',
+      helpText: 'Select Kitchen Closed Time',
     );
 
     if (pickedTime != null) {
-      // Only set time, don't enable/disable here
       await settingsProvider.setKitchenClosedTime(pickedTime);
     }
   }
 
-  // --- New Helper to show Title Selection Dialog ---
   Future<void> _showTitleSelectionDialog(BuildContext context) async {
     final settingsProvider = context.read<SettingsProvider>();
     String? currentSelection = settingsProvider.stopEatingTitle;
@@ -38,11 +34,10 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Use StatefulBuilder to manage the dropdown state within the dialog
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Select Notification Title'),
+              title: const Text('Select Reminder Title'),
               content: DropdownButton<String>(
                 value: currentSelection,
                 isExpanded: true,
@@ -63,7 +58,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
                 TextButton(
                   child: const Text('Cancel'),
                   onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Close without saving
+                    Navigator.of(dialogContext).pop();
                   },
                 ),
                 TextButton(
@@ -72,7 +67,7 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
                     if (currentSelection != null) {
                       settingsProvider.setStopEatingTitle(currentSelection!);
                     }
-                    Navigator.of(dialogContext).pop(); // Close after saving
+                    Navigator.of(dialogContext).pop();
                   },
                 ),
               ],
@@ -82,52 +77,63 @@ class _StopEatingSettingsScreenState extends State<StopEatingSettingsScreen> {
       },
     );
   }
-  // --- End of New Helper ---
 
   @override
   Widget build(BuildContext context) {
     return Consumer<SettingsProvider>(
       builder: (context, settings, child) {
         final isEnabled = settings.stopEatingEnabled;
-        final selectedTime =
-            settings.kitchenClosedTime; // Getter handles enabled state
+        final selectedTime = settings.kitchenClosedTime;
         final selectedTitle = settings.stopEatingTitle;
         final formattedTime =
             selectedTime != null ? selectedTime.format(context) : 'Not set';
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Stop Eating Settings'),
+            title: const Text('Kitchen Closed'),
           ),
           body: ListView(
             children: [
               SwitchListTile(
                 title: const Text('Enabled'),
+                subtitle: const Text('Show reminder after this time'),
                 value: isEnabled,
                 onChanged: (bool value) async {
                   await settings.setStopEatingEnabled(value);
-                  // Optionally, prompt to set time if enabling and no time is set
                   if (value && settings.kitchenClosedTime == null) {
-                    _selectStopTime(context);
+                    if (mounted) {
+                      _selectStopTime(context);
+                    }
                   }
                 },
               ),
               const Divider(),
               ListTile(
-                title: const Text('Stop Eating Time'),
+                leading: const Icon(Icons.access_time),
+                title: const Text('Time'),
                 subtitle: Text(formattedTime),
-                enabled: isEnabled, // Disable if feature is off
+                enabled: isEnabled,
                 onTap: isEnabled ? () => _selectStopTime(context) : null,
               ),
               const Divider(),
               ListTile(
-                title: const Text('Title'),
+                leading: const Icon(Icons.title),
+                title: const Text('Reminder Title'),
                 subtitle: Text(selectedTitle),
-                enabled: isEnabled, // Disable if feature is off
+                enabled: isEnabled,
                 onTap: isEnabled
-                    ? () => _showTitleSelectionDialog(
-                        context) // Call the dialog helper
+                    ? () => _showTitleSelectionDialog(context)
                     : null,
+              ),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'When enabled, a gentle reminder will appear if you open the app after the set time, asking if you\'re truly hungry or just snacking out of habit.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
               ),
             ],
           ),

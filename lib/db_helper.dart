@@ -2,8 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
-import 'models/favorite_item.dart';
-import 'models/food_entry.dart';
+import 'models/eating_log.dart';
 
 class DBHelper {
   static final DBHelper _instance = DBHelper._internal();
@@ -24,60 +23,79 @@ class DBHelper {
     String path = join(await getDatabasesPath(), 'food_tracking.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Bump version for migration
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE food_entries(
+      CREATE TABLE eating_logs(
         id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        calories INTEGER,
-        protein REAL,
-        carbs REAL,
-        fat REAL,
-        notes TEXT,
-        created_at TEXT NOT NULL,
-        meal_type TEXT NOT NULL,
-        entry_date TEXT NOT NULL
+        description TEXT NOT NULL,
+        hunger_level INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        entry_date TEXT NOT NULL,
+        created_at TEXT NOT NULL
       )
     ''');
-    await db
-        .execute('CREATE INDEX idx_entry_date ON food_entries(entry_date);');
-
-    await db.execute('''
-      CREATE TABLE daily_summaries(
-        date TEXT PRIMARY KEY,
-        total_calories INTEGER,
-        total_protein REAL,
-        total_carbs REAL,
-        total_fat REAL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE favorites(
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        calories INTEGER DEFAULT 0,
-        protein REAL DEFAULT 0.0,
-        carbs REAL DEFAULT 0.0,
-        fat REAL DEFAULT 0.0,
-        meal_type TEXT NOT NULL
-      )
-    ''');
+    await db.execute('CREATE INDEX idx_eating_logs_entry_date ON eating_logs(entry_date);');
+    await db.execute('CREATE INDEX idx_eating_logs_created_at ON eating_logs(created_at);');
   }
 
-  Future<String> addFoodEntry({
-    required String name,
-    required int calories,
-    required double protein,
-    required double carbs,
-    required double fat,
-    required String mealType,
-    String? notes,
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Migration from version 1 (old food tracking schema) to version 2 (mindful eating)
+      // Create new eating_logs table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS eating_logs(
+          id TEXT PRIMARY KEY,
+          description TEXT NOT NULL,
+          hunger_level INTEGER NOT NULL,
+          reason TEXT NOT NULL,
+          entry_date TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_eating_logs_entry_date ON eating_logs(entry_date);');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_eating_logs_created_at ON eating_logs(created_at);');
+
+      // Migrate existing food_entries to eating_logs
+      // We'll convert them with default hunger_level=3 and reason='hungry'
+      try {
+        final oldEntries = await db.query('food_entries');
+        for (var entry in oldEntries) {
+          await db.insert('eating_logs', {
+            'id': entry['id'],
+            'description': entry['name'],
+            'hunger_level': 3, // Default middle hunger
+            'reason': 'hungry', // Default reason
+            'entry_date': entry['entry_date'],
+            'created_at': entry['created_at'],
+          });
+        }
+      } catch (e) {
+        // Old table might not exist, that's okay
+      }
+
+      // Drop old tables
+      try {
+        await db.execute('DROP TABLE IF EXISTS food_entries');
+        await db.execute('DROP TABLE IF EXISTS daily_summaries');
+        await db.execute('DROP TABLE IF EXISTS favorites');
+      } catch (e) {
+        // Tables might not exist
+      }
+    }
+  }
+
+  // === Eating Log Methods ===
+
+  Future<String> addEatingLog({
+    required String description,
+    required int hungerLevel,
+    required EatingReason reason,
     required DateTime entryDate,
   }) async {
     final Database db = await database;
@@ -86,297 +104,248 @@ class DBHelper {
     final String entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
 
     await db.insert(
-      'food_entries',
+      'eating_logs',
       {
         'id': id,
-        'name': name,
-        'calories': calories,
-        'protein': protein,
-        'carbs': carbs,
-        'fat': fat,
-        'notes': notes,
-        'created_at': now.toIso8601String(),
-        'meal_type': mealType,
+        'description': description,
+        'hunger_level': hungerLevel.clamp(1, 5),
+        'reason': reason.name,
         'entry_date': entryDateStr,
+        'created_at': now.toIso8601String(),
       },
     );
-
-    await _updateDailySummary(entryDate);
 
     return id;
   }
 
-  Future<void> _updateDailySummary(DateTime date) async {
-    final Database db = await database;
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-
-    final entries = await db.query(
-      'food_entries',
-      where: 'entry_date = ?',
-      whereArgs: [dateStr],
-    );
-
-    int totalCalories = 0;
-    double totalProtein = 0;
-    double totalCarbs = 0;
-    double totalFat = 0;
-
-    for (var entry in entries) {
-      totalCalories += (entry['calories'] as int?) ?? 0;
-      totalProtein += (entry['protein'] as double?) ?? 0.0;
-      totalCarbs += (entry['carbs'] as double?) ?? 0.0;
-      totalFat += (entry['fat'] as double?) ?? 0.0;
-    }
-
-    await db.insert(
-      'daily_summaries',
-      {
-        'date': dateStr,
-        'total_calories': totalCalories,
-        'total_protein': totalProtein,
-        'total_carbs': totalCarbs,
-        'total_fat': totalFat,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getFoodEntriesForDate(
-      DateTime date) async {
+  Future<List<Map<String, dynamic>>> getEatingLogsForDate(DateTime date) async {
     final Database db = await database;
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     return await db.query(
-      'food_entries',
+      'eating_logs',
       where: 'entry_date = ?',
       whereArgs: [dateStr],
       orderBy: 'created_at DESC',
     );
   }
 
-  Future<Map<String, dynamic>?> getDailySummary(DateTime date) async {
-    final Database db = await database;
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    final List<Map<String, dynamic>> summaries = await db.query(
-      'daily_summaries',
-      where: 'date = ?',
-      whereArgs: [dateStr],
-      limit: 1,
-    );
-    return summaries.isNotEmpty ? summaries.first : null;
-  }
-
-  Future<void> deleteFoodEntry(String id) async {
-    final Database db = await database;
-    final entries = await db.query(
-      'food_entries',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-
-    if (entries.isNotEmpty) {
-      final entryDateStr = entries.first['entry_date'] as String?;
-      await db.delete(
-        'food_entries',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      if (entryDateStr != null) {
-        try {
-          final entryDate = DateFormat('yyyy-MM-dd').parse(entryDateStr);
-          await _updateDailySummary(entryDate);
-        } catch (e) {
-          // print("Error parsing entry_date for summary update after delete: $e");
-        }
-      }
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> searchFoodEntries(String query) async {
-    final Database db = await database;
-    return await db.query(
-      'food_entries',
-      where: 'name LIKE ?',
-      whereArgs: ['%$query%'],
-      orderBy: 'created_at DESC',
-    );
-  }
-
-  Future<Map<String, int>> getMealTypeCounts(DateTime date) async {
-    final Database db = await database;
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    final entries = await db.query(
-      'food_entries',
-      where: 'entry_date = ?',
-      whereArgs: [dateStr],
-    );
-    Map<String, int> counts = {
-      'Breakfast': 0,
-      'Lunch': 0,
-      'Dinner': 0,
-      'Snack': 0,
-      'Coffee': 0,
-    };
-    for (var entry in entries) {
-      final mealType = entry['meal_type'] as String?;
-      if (mealType != null && counts.containsKey(mealType)) {
-        counts[mealType] = counts[mealType]! + 1;
-      }
-    }
-    return counts;
-  }
-
-  Future<String> addFavorite({
-    required String name,
-    required int calories,
-    required double protein,
-    required double carbs,
-    required double fat,
-    required String mealType,
-  }) async {
-    final Database db = await database;
-    final String id = uuid.v4();
-
-    await db.insert(
-      'favorites',
-      {
-        'id': id,
-        'name': name,
-        'calories': calories,
-        'protein': protein,
-        'carbs': carbs,
-        'fat': fat,
-        'meal_type': mealType,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-    return id;
-  }
-
-  Future<List<Map<String, dynamic>>> getFavorites() async {
-    final Database db = await database;
-    return await db.query('favorites', orderBy: 'name ASC');
-  }
-
-  Future<void> deleteFavorite(String id) async {
+  Future<void> deleteEatingLog(String id) async {
     final Database db = await database;
     await db.delete(
-      'favorites',
+      'eating_logs',
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  Future<void> updateFavorite(FavoriteItem favorite) async {
+  Future<void> updateEatingLog(EatingLog log) async {
     final Database db = await database;
     await db.update(
-      'favorites',
-      favorite.toMap(),
+      'eating_logs',
+      log.toMap(),
       where: 'id = ?',
-      whereArgs: [favorite.id],
+      whereArgs: [log.id],
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<void> updateFoodEntry(FoodEntry entry) async {
-    final Database db = await database;
-    await db.update(
-      'food_entries',
-      entry.toMap(),
-      where: 'id = ?',
-      whereArgs: [entry.id],
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-    await _updateDailySummary(entry.entryDate);
-  }
-
-  Future<List<Map<String, dynamic>>> getFoodEntriesBetweenDates(
+  Future<List<Map<String, dynamic>>> getEatingLogsBetweenDates(
       DateTime startDate, DateTime endDate) async {
     final Database db = await database;
     final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
     final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
 
     return await db.query(
-      'food_entries',
+      'eating_logs',
       where: 'entry_date >= ? AND entry_date <= ?',
       whereArgs: [startDateStr, endDateStr],
       orderBy: 'created_at ASC',
     );
   }
 
-  Future<Map<String, int>> getAllFoodFrequencies() async {
+  Future<List<Map<String, dynamic>>> getAllEatingLogs() async {
+    final Database db = await database;
+    return await db.query('eating_logs', orderBy: 'created_at DESC');
+  }
+
+  // === Analytics Methods ===
+
+  /// Get counts by reason for a date range
+  Future<Map<String, int>> getReasonCounts(DateTime startDate, DateTime endDate) async {
     final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
 
-    // Get frequencies from food entries
-    final List<Map<String, dynamic>> entriesResult = await db.rawQuery('''
-      SELECT name, COUNT(*) as frequency
-      FROM food_entries
-      GROUP BY name
-    ''');
+    final results = await db.rawQuery('''
+      SELECT reason, COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      GROUP BY reason
+    ''', [startDateStr, endDateStr]);
 
-    // Convert to Map<String, int>
-    Map<String, int> frequencies = {};
-    for (var row in entriesResult) {
-      frequencies[row['name'] as String] = row['frequency'] as int;
+    Map<String, int> counts = {
+      'hungry': 0,
+      'bored': 0,
+      'craving': 0,
+      'social': 0,
+    };
+
+    for (var row in results) {
+      final reason = row['reason'] as String;
+      counts[reason] = row['count'] as int;
     }
 
-    // Add favorites to the frequencies (count as 1 if not already counted)
-    final List<Map<String, dynamic>> favorites = await db.query('favorites');
-    for (var favorite in favorites) {
-      String name = favorite['name'] as String;
-      frequencies[name] = frequencies[name] ?? 1;
+    return counts;
+  }
+
+  /// Get average hunger level for a date range
+  Future<double> getAverageHungerLevel(DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final result = await db.rawQuery('''
+      SELECT AVG(hunger_level) as avg_hunger
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+    ''', [startDateStr, endDateStr]);
+
+    if (result.isNotEmpty && result.first['avg_hunger'] != null) {
+      return (result.first['avg_hunger'] as num).toDouble();
+    }
+    return 0.0;
+  }
+
+  /// Get count of entries by hour of day for time patterns
+  Future<Map<int, int>> getHourlyDistribution(DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final results = await db.rawQuery('''
+      SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour, COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      GROUP BY hour
+      ORDER BY hour
+    ''', [startDateStr, endDateStr]);
+
+    Map<int, int> distribution = {};
+    for (int i = 0; i < 24; i++) {
+      distribution[i] = 0;
     }
 
-    return frequencies;
+    for (var row in results) {
+      final hour = row['hour'] as int;
+      distribution[hour] = row['count'] as int;
+    }
+
+    return distribution;
   }
 
-  Future<List<String>> searchFoodNames(String query) async {
+  /// Get count of entries by day of week (0 = Monday, 6 = Sunday)
+  Future<Map<int, int>> getWeekdayDistribution(DateTime startDate, DateTime endDate) async {
     final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
 
-    // Search in both food entries and favorites
-    final List<Map<String, dynamic>> results = await db.rawQuery('''
-      SELECT DISTINCT name, 
-             (SELECT COUNT(*) FROM food_entries fe WHERE fe.name = e.name) as frequency
-      FROM (
-        SELECT name FROM food_entries
-        UNION
-        SELECT name FROM favorites
-      ) e
-      WHERE name LIKE ?
-      ORDER BY frequency DESC
-      LIMIT 5
-    ''', ['%$query%']);
+    // SQLite strftime('%w') returns 0-6 where 0 = Sunday
+    final results = await db.rawQuery('''
+      SELECT CAST(strftime('%w', entry_date) AS INTEGER) as weekday, COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      GROUP BY weekday
+      ORDER BY weekday
+    ''', [startDateStr, endDateStr]);
 
-    return results.map((row) => row['name'] as String).toList();
+    // Convert SQLite weekday (0=Sunday) to Dart weekday (1=Monday...7=Sunday)
+    Map<int, int> distribution = {};
+    for (int i = 1; i <= 7; i++) {
+      distribution[i] = 0;
+    }
+
+    for (var row in results) {
+      final sqliteWeekday = row['weekday'] as int;
+      // Convert: 0 (Sun) -> 7, 1 (Mon) -> 1, etc.
+      final dartWeekday = sqliteWeekday == 0 ? 7 : sqliteWeekday;
+      distribution[dartWeekday] = row['count'] as int;
+    }
+
+    return distribution;
   }
 
-  Future<List<Map<String, dynamic>>> getUniqueFoodItems() async {
+  /// Get count of low-mindful eating (hunger <= 2 and reason != hungry)
+  Future<int> getLowMindfulEatingCount(DateTime startDate, DateTime endDate) async {
     final db = await database;
-    // Select the most recent data for each unique food name
-    final List<Map<String, dynamic>> results = await db.rawQuery('''
-      SELECT name, calories, protein, carbs, fat, meal_type
-      FROM (
-        SELECT
-          name, calories, protein, carbs, fat, meal_type,
-          ROW_NUMBER() OVER(PARTITION BY name ORDER BY created_at DESC) as rn
-        FROM food_entries
-      )
-      WHERE rn = 1
-      ORDER BY name ASC;
-    ''');
-    return results;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      AND hunger_level <= 2
+      AND reason != 'hungry'
+    ''', [startDateStr, endDateStr]);
+
+    return result.first['count'] as int;
   }
 
-  Future<int> deleteAllEntriesByName(String name) async {
+  /// Get hunger level distribution
+  Future<Map<int, int>> getHungerLevelDistribution(DateTime startDate, DateTime endDate) async {
     final db = await database;
-    // Delete all entries matching the name
-    int count = await db.delete(
-      'food_entries',
-      where: 'name = ?',
-      whereArgs: [name],
-    );
-    // Note: This doesn't automatically update daily summaries for all potentially affected dates.
-    // A more complex implementation would be needed to recalculate summaries if required.
-    return count;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final results = await db.rawQuery('''
+      SELECT hunger_level, COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      GROUP BY hunger_level
+      ORDER BY hunger_level
+    ''', [startDateStr, endDateStr]);
+
+    Map<int, int> distribution = {};
+    for (int i = 1; i <= 5; i++) {
+      distribution[i] = 0;
+    }
+
+    for (var row in results) {
+      final level = row['hunger_level'] as int;
+      distribution[level] = row['count'] as int;
+    }
+
+    return distribution;
+  }
+
+  /// Get late night eating count (after 10 PM)
+  Future<int> getLateNightEatingCount(DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      AND CAST(strftime('%H', created_at) AS INTEGER) >= 22
+    ''', [startDateStr, endDateStr]);
+
+    return result.first['count'] as int;
+  }
+
+  /// Get total entry count for a date range
+  Future<int> getEntryCount(DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+    ''', [startDateStr, endDateStr]);
+
+    return result.first['count'] as int;
   }
 }
