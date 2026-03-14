@@ -348,4 +348,44 @@ class DBHelper {
 
     return result.first['count'] as int;
   }
+
+  /// Get hourly distribution by reason for stacked bar chart
+  Future<Map<int, Map<String, int>>> getHourlyDistributionByReason(
+      DateTime startDate, DateTime endDate) async {
+    final db = await database;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final results = await db.rawQuery('''
+      SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
+             reason,
+             COUNT(*) as count
+      FROM eating_logs
+      WHERE entry_date >= ? AND entry_date <= ?
+      GROUP BY hour, reason
+      ORDER BY hour, reason
+    ''', [startDateStr, endDateStr]);
+
+    // Initialize empty map for all hours
+    Map<int, Map<String, int>> distribution = {};
+    for (int i = 0; i < 24; i++) {
+      distribution[i] = {
+        'hungry': 0,
+        'bored': 0,
+        'craving': 0,
+        'social': 0,
+      };
+    }
+
+    for (var row in results) {
+      final hour = row['hour'] as int;
+      final reason = row['reason'] as String;
+      final count = row['count'] as int;
+      if (distribution[hour]!.containsKey(reason)) {
+        distribution[hour]![reason] = count;
+      }
+    }
+
+    return distribution;
+  }
 }

@@ -19,7 +19,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   // Analytics data
   Map<String, int> _reasonCounts = {};
   double _averageHunger = 0;
-  Map<int, int> _hourlyDistribution = {};
+  Map<int, Map<String, int>> _hourlyByReason = {};
   Map<int, int> _hungerDistribution = {};
   int _totalEntries = 0;
   int _lowMindfulCount = 0;
@@ -45,7 +45,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
       final results = await Future.wait([
         _dbHelper.getReasonCounts(startDate, endDate),
         _dbHelper.getAverageHungerLevel(startDate, endDate),
-        _dbHelper.getHourlyDistribution(startDate, endDate),
+        _dbHelper.getHourlyDistributionByReason(startDate, endDate),
         _dbHelper.getHungerLevelDistribution(startDate, endDate),
         _dbHelper.getEntryCount(startDate, endDate),
         _dbHelper.getLowMindfulEatingCount(startDate, endDate),
@@ -56,7 +56,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         setState(() {
           _reasonCounts = results[0] as Map<String, int>;
           _averageHunger = results[1] as double;
-          _hourlyDistribution = results[2] as Map<int, int>;
+          _hourlyByReason = results[2] as Map<int, Map<String, int>>;
           _hungerDistribution = results[3] as Map<int, int>;
           _totalEntries = results[4] as int;
           _lowMindfulCount = results[5] as int;
@@ -248,7 +248,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
       children: [
         Text(
           'Why you ate',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
         ),
@@ -344,116 +344,88 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
     final total = _hungerDistribution.values.fold<int>(0, (sum, v) => sum + v);
     if (total == 0) return const SizedBox.shrink();
 
-    final highHungerCount = (_hungerDistribution[4] ?? 0) + (_hungerDistribution[5] ?? 0);
-    final highHungerPercent = (highHungerCount / total * 100).round();
-    final isGood = highHungerPercent >= 50;
+    final maxCount = _hungerDistribution.values.fold<int>(0, (max, v) => v > max ? v : max);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Hunger levels',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          AppStrings.hungerLevels,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: (isGood ? Colors.green : Colors.orange).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 120,
           child: Row(
-            children: [
-              Icon(
-                isGood ? Icons.check_circle : Icons.info_outline,
-                color: isGood ? Colors.green : Colors.orange,
-                size: 32,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$highHungerPercent% mindful eating',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(5, (index) {
+              final level = index + 1;
+              final count = _hungerDistribution[level] ?? 0;
+              final heightPercent = maxCount > 0 ? count / maxCount : 0.0;
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Tooltip(
+                    message: 'Hunger $level: $count entries',
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (count > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '$count',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
                           ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isGood
-                          ? 'You mostly eat when actually hungry'
-                          : 'You often eat when not very hungry',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        Container(
+                          width: double.infinity,
+                          height: 80 * heightPercent + (count > 0 ? 4 : 0),
+                          decoration: BoxDecoration(
+                            color: AppTheme.hungerColor(level),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                           ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              );
+            }),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(5, (index) {
             final level = index + 1;
-            final count = _hungerDistribution[level] ?? 0;
-            final maxCount = _hungerDistribution.values.fold<int>(0, (max, v) => v > max ? v : max);
-            final heightPercent = maxCount > 0 ? count / maxCount : 0.0;
-
             return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  children: [
-                    Container(
-                      height: 60,
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        width: double.infinity,
-                        height: 60 * heightPercent,
-                        decoration: BoxDecoration(
-                          color: AppTheme.hungerColor(level),
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                        ),
-                      ),
+              child: Text(
+                '$level',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$level',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    Text(
-                      '$count',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
               ),
             );
           }),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Not hungry',
+              AppStrings.notHungry,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             Text(
-              'Very hungry',
+              AppStrings.veryHungry,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -465,67 +437,138 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   }
 
   Widget _buildTimeInsight() {
-    // Find peak hours
-    final sortedHours = _hourlyDistribution.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final peakHours = sortedHours.take(3).where((e) => e.value > 0).toList();
+    // Calculate max total count for any hour
+    int maxCount = 0;
+    for (int hour = 6; hour <= 23; hour++) {
+      final hourData = _hourlyByReason[hour] ?? {};
+      final total = hourData.values.fold<int>(0, (sum, v) => sum + v);
+      if (total > maxCount) maxCount = total;
+    }
+    if (maxCount == 0) return const SizedBox.shrink();
 
-    if (peakHours.isEmpty) return const SizedBox.shrink();
+    const startHour = 6;
+    const endHour = 23;
+    const reasons = ['hungry', 'bored', 'craving', 'social'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Peak eating times',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          AppStrings.eatingTimes,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: peakHours.map((entry) {
-            final hour = entry.key;
-            final timeStr = DateFormat.j().format(DateTime(2024, 1, 1, hour));
-            final isLateNight = hour >= 21 || hour < 5;
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 120,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(endHour - startHour + 1, (index) {
+              final hour = startHour + index;
+              final hourData = _hourlyByReason[hour] ?? {};
+              final total = hourData.values.fold<int>(0, (sum, v) => sum + v);
+              final totalHeight = maxCount > 0 ? (80 * total / maxCount) + (total > 0 ? 4 : 0) : 0.0;
 
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isLateNight
-                    ? Colors.purple.withOpacity(0.1)
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isLateNight ? Icons.nightlight_round : Icons.access_time,
-                    size: 18,
-                    color: isLateNight ? Colors.purple : Theme.of(context).colorScheme.primary,
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: Tooltip(
+                    message: _buildHourTooltip(hour, hourData),
+                    child: SizedBox(
+                      height: totalHeight,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: reasons.reversed.map((reason) {
+                          final count = hourData[reason] ?? 0;
+                          if (count == 0) return const SizedBox.shrink();
+                          final segmentHeight = totalHeight * (count / total);
+                          return Container(
+                            width: double.infinity,
+                            height: segmentHeight,
+                            color: AppTheme.reasonColors[reason],
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    timeStr,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '6am',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '(${entry.value}x)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+            ),
+            Text(
+              '12pm',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ],
-              ),
+            ),
+            Text(
+              '6pm',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            Text(
+              '11pm',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Legend
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: reasons.map((reason) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: AppTheme.reasonColors[reason],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _reasonLabel(reason),
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
             );
           }).toList(),
         ),
       ],
     );
+  }
+
+  String _buildHourTooltip(int hour, Map<String, int> hourData) {
+    final timeStr = DateFormat.j().format(DateTime(2024, 1, 1, hour));
+    final total = hourData.values.fold<int>(0, (sum, v) => sum + v);
+    if (total == 0) return '$timeStr: no entries';
+
+    final parts = <String>[];
+    for (final reason in ['hungry', 'bored', 'craving', 'social']) {
+      final count = hourData[reason] ?? 0;
+      if (count > 0) {
+        parts.add('${_reasonLabel(reason)}: $count');
+      }
+    }
+    return '$timeStr ($total)\n${parts.join(', ')}';
   }
 }

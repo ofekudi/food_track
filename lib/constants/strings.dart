@@ -57,7 +57,8 @@ class AppStrings {
   static const whyYouEat = 'Why You Eat';
   static const hungerPatterns = 'Hunger Patterns';
   static const whenYouEat = 'When You Eat';
-  static const peakEatingTimes = 'Peak eating times:';
+  static const eatingTimes = 'Eating times';
+  static const hungerLevels = 'Hunger levels';
   static const byDayOfWeek = 'By day of week:';
   static const lowHungerWarning = '% of eating happened at low hunger (1-2)';
   static const ateWhenNotHungry = 'You ate when not hungry %d times this week';
