@@ -48,7 +48,7 @@ class AppStrings {
   static const habit = 'Habit';
 
   // Analytics
-  static const weeklyInsights = 'Weekly Insights';
+  static const weeklyInsights = 'Insights';
   static const noDataTitle = 'No data for this period';
   static const noDataSubtitle = 'Start logging your meals to see insights';
   static const totalEntries = 'Total Entries';

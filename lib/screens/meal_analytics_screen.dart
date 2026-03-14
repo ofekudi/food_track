@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../db_helper.dart';
 import '../constants/strings.dart';
@@ -21,7 +20,6 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   Map<String, int> _reasonCounts = {};
   double _averageHunger = 0;
   Map<int, int> _hourlyDistribution = {};
-  Map<int, int> _weekdayDistribution = {};
   Map<int, int> _hungerDistribution = {};
   int _totalEntries = 0;
   int _lowMindfulCount = 0;
@@ -48,7 +46,6 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         _dbHelper.getReasonCounts(startDate, endDate),
         _dbHelper.getAverageHungerLevel(startDate, endDate),
         _dbHelper.getHourlyDistribution(startDate, endDate),
-        _dbHelper.getWeekdayDistribution(startDate, endDate),
         _dbHelper.getHungerLevelDistribution(startDate, endDate),
         _dbHelper.getEntryCount(startDate, endDate),
         _dbHelper.getLowMindfulEatingCount(startDate, endDate),
@@ -60,11 +57,10 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
           _reasonCounts = results[0] as Map<String, int>;
           _averageHunger = results[1] as double;
           _hourlyDistribution = results[2] as Map<int, int>;
-          _weekdayDistribution = results[3] as Map<int, int>;
-          _hungerDistribution = results[4] as Map<int, int>;
-          _totalEntries = results[5] as int;
-          _lowMindfulCount = results[6] as int;
-          _lateNightCount = results[7] as int;
+          _hungerDistribution = results[3] as Map<int, int>;
+          _totalEntries = results[4] as int;
+          _lowMindfulCount = results[5] as int;
+          _lateNightCount = results[6] as int;
           _isLoading = false;
         });
       }
@@ -77,17 +73,25 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
     }
   }
 
+  String get _periodLabel {
+    switch (_daysToShow) {
+      case 7:
+        return 'Last 7 days';
+      case 14:
+        return 'Last 14 days';
+      case 30:
+        return 'Last 30 days';
+      default:
+        return 'Last $_daysToShow days';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.weeklyInsights),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: _loadData,
-          ),
           PopupMenuButton<int>(
             tooltip: 'Time range',
             onSelected: (int value) {
@@ -108,18 +112,20 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _totalEntries == 0
               ? _buildEmptyState()
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16.0),
                     children: [
-                      _buildSummaryCards(),
+                      _buildPeriodHeader(),
+                      const SizedBox(height: 20),
+                      _buildKeyStats(),
                       const SizedBox(height: 24),
-                      _buildReasonPatternsSection(),
+                      _buildReasonBreakdown(),
                       const SizedBox(height: 24),
-                      _buildHungerPatternsSection(),
+                      _buildHungerInsight(),
                       const SizedBox(height: 24),
-                      _buildTimePatternsSection(),
+                      _buildTimeInsight(),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -154,381 +160,370 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
     );
   }
 
-  Widget _buildSummaryCards() {
+  Widget _buildPeriodHeader() {
+    return Text(
+      _periodLabel,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
+  }
+
+  Widget _buildKeyStats() {
     return Row(
       children: [
         Expanded(
-          child: _buildSummaryCard(
-            AppStrings.totalEntries,
-            '$_totalEntries',
-            Icons.restaurant_menu,
-            Theme.of(context).colorScheme.primary,
+          child: _buildStatCard(
+            value: '$_totalEntries',
+            label: 'entries',
+            icon: Icons.restaurant,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildSummaryCard(
-            AppStrings.avgHunger,
-            _averageHunger.toStringAsFixed(1),
-            Icons.show_chart,
-            Colors.blue,
+          child: _buildStatCard(
+            value: _averageHunger.toStringAsFixed(1),
+            label: 'avg hunger',
+            icon: Icons.speed,
+            color: _averageHunger >= 3 ? Colors.green : Colors.orange,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildSummaryCard(
-            AppStrings.lateNight,
-            '$_lateNightCount',
-            Icons.nightlight,
-            Colors.purple,
+          child: _buildStatCard(
+            value: '$_lateNightCount',
+            label: 'after 9pm',
+            icon: Icons.nightlight_round,
+            color: _lateNightCount > 0 ? Colors.purple : Colors.grey,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard(String label, String value, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+  Widget _buildStatCard({
+    required String value,
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildReasonPatternsSection() {
+  Widget _buildReasonBreakdown() {
     final total = _reasonCounts.values.fold<int>(0, (sum, v) => sum + v);
     if (total == 0) return const SizedBox.shrink();
 
-    final reasonLabels = {
-      'hungry': AppStrings.reasonHungry,
-      'bored': AppStrings.reasonBored,
-      'craving': AppStrings.reasonCraving,
-      'social': AppStrings.reasonSocial,
-    };
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.pie_chart),
-                const SizedBox(width: 8),
-                Text(
-                  AppStrings.whyYouEat,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: _buildReasonPieSections(total),
-                  sectionsSpace: 2,
-                  centerSpaceRadius: 40,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              children: _reasonCounts.entries.map((entry) {
-                final count = entry.value;
-                final percentage = total > 0 ? (count / total * 100).round() : 0;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: AppTheme.reasonColors[entry.key],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${reasonLabels[entry.key]}: $count ($percentage%)',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-            if (_lowMindfulCount > 0) ...[
-              const Divider(height: 24),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.lightbulb_outline,
-                    color: Colors.orange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You ate when not hungry $_lowMindfulCount times this week',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _buildReasonPieSections(int total) {
-    return _reasonCounts.entries.where((e) => e.value > 0).map((entry) {
-      final percentage = (entry.value / total * 100).round();
-      return PieChartSectionData(
-        value: entry.value.toDouble(),
-        title: '$percentage%',
-        color: AppTheme.reasonColors[entry.key] ?? Colors.grey,
-        radius: 60,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildHungerPatternsSection() {
-    final total = _hungerDistribution.values.fold<int>(0, (sum, v) => sum + v);
-    if (total == 0) return const SizedBox.shrink();
-
-    final lowHungerCount = (_hungerDistribution[1] ?? 0) + (_hungerDistribution[2] ?? 0);
-    final lowHungerPercent = (lowHungerCount / total * 100).round();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.show_chart),
-                const SizedBox(width: 8),
-                Text(
-                  AppStrings.hungerPatterns,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 150,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _hungerDistribution.values.fold<int>(0, (max, v) => v > max ? v : max).toDouble() + 2,
-                  barTouchData: BarTouchData(enabled: false),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${value.toInt()}',
-                            style: const TextStyle(fontSize: 12),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  gridData: const FlGridData(show: false),
-                  barGroups: List.generate(5, (index) {
-                    final level = index + 1;
-                    final count = _hungerDistribution[level] ?? 0;
-                    return BarChartGroupData(
-                      x: level,
-                      barRods: [
-                        BarChartRodData(
-                          toY: count.toDouble(),
-                          color: AppTheme.hungerColor(level),
-                          width: 32,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                        ),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                'Hunger level 1 (not hungry) to 5 (very hungry)',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Icon(
-                  lowHungerPercent > 30 ? Icons.warning_amber : Icons.check_circle,
-                  color: lowHungerPercent > 30 ? Colors.orange : Colors.green,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '$lowHungerPercent${AppStrings.lowHungerWarning}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimePatternsSection() {
-    // Find peak hours
-    final sortedHours = _hourlyDistribution.entries.toList()
+    final sortedReasons = _reasonCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final peakHours = sortedHours.take(3).where((e) => e.value > 0).toList();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.schedule),
-                const SizedBox(width: 8),
-                Text(
-                  AppStrings.whenYouEat,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (peakHours.isNotEmpty) ...[
-              Text(
-                AppStrings.peakEatingTimes,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: peakHours.map((entry) {
-                  final hour = entry.key;
-                  final timeStr = DateFormat.j().format(DateTime(2024, 1, 1, hour));
-                  return Chip(
-                    label: Text('$timeStr (${entry.value}x)'),
-                    avatar: const Icon(Icons.access_time, size: 16),
-                  );
-                }).toList(),
-              ),
-            ],
-            const SizedBox(height: 16),
-            _buildWeekdayChart(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWeekdayChart() {
-    final maxValue = _weekdayDistribution.values.fold<int>(0, (max, v) => v > max ? v : max);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppStrings.byDayOfWeek,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
+          'Why you ate',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(7, (index) {
-            final day = index + 1; // 1=Monday, 7=Sunday
-            final count = _weekdayDistribution[day] ?? 0;
-            final height = maxValue > 0 ? (count / maxValue * 40) : 0.0;
+        const SizedBox(height: 12),
+        ...sortedReasons.where((e) => e.value > 0).map((entry) {
+          final percentage = (entry.value / total * 100).round();
+          final color = AppTheme.reasonColors[entry.key] ?? Colors.grey;
+          final icon = AppTheme.reasonIcon(entry.key);
+          final label = _reasonLabel(entry.key);
 
-            return Column(
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 40,
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    width: 24,
-                    height: height,
-                    decoration: BoxDecoration(
-                      color: (day == 6 || day == 7)
-                          ? Theme.of(context).colorScheme.tertiary
-                          : Theme.of(context).colorScheme.primary,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percentage / 100,
+                      backgroundColor: color.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      minHeight: 8,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  AppStrings.weekdays[index],
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-                Text(
-                  '$count',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 48,
+                  child: Text(
+                    '$percentage%',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                    textAlign: TextAlign.right,
+                  ),
                 ),
               ],
+            ),
+          );
+        }),
+        if (_lowMindfulCount > 0) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lightbulb_outline, color: Colors.orange, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '$_lowMindfulCount times you ate when not hungry',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _reasonLabel(String reason) {
+    switch (reason) {
+      case 'hungry':
+        return 'Hungry';
+      case 'bored':
+        return 'Bored';
+      case 'craving':
+        return 'Craving';
+      case 'social':
+        return 'Social';
+      default:
+        return reason;
+    }
+  }
+
+  Widget _buildHungerInsight() {
+    final total = _hungerDistribution.values.fold<int>(0, (sum, v) => sum + v);
+    if (total == 0) return const SizedBox.shrink();
+
+    final highHungerCount = (_hungerDistribution[4] ?? 0) + (_hungerDistribution[5] ?? 0);
+    final highHungerPercent = (highHungerCount / total * 100).round();
+    final isGood = highHungerPercent >= 50;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hunger levels',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: (isGood ? Colors.green : Colors.orange).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isGood ? Icons.check_circle : Icons.info_outline,
+                color: isGood ? Colors.green : Colors.orange,
+                size: 32,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$highHungerPercent% mindful eating',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isGood
+                          ? 'You mostly eat when actually hungry'
+                          : 'You often eat when not very hungry',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(5, (index) {
+            final level = index + 1;
+            final count = _hungerDistribution[level] ?? 0;
+            final maxCount = _hungerDistribution.values.fold<int>(0, (max, v) => v > max ? v : max);
+            final heightPercent = maxCount > 0 ? count / maxCount : 0.0;
+
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  children: [
+                    Container(
+                      height: 60,
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: double.infinity,
+                        height: 60 * heightPercent,
+                        decoration: BoxDecoration(
+                          color: AppTheme.hungerColor(level),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$level',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    Text(
+                      '$count',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
             );
           }),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Not hungry',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            Text(
+              'Very hungry',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeInsight() {
+    // Find peak hours
+    final sortedHours = _hourlyDistribution.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final peakHours = sortedHours.take(3).where((e) => e.value > 0).toList();
+
+    if (peakHours.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Peak eating times',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: peakHours.map((entry) {
+            final hour = entry.key;
+            final timeStr = DateFormat.j().format(DateTime(2024, 1, 1, hour));
+            final isLateNight = hour >= 21 || hour < 5;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isLateNight
+                    ? Colors.purple.withOpacity(0.1)
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isLateNight ? Icons.nightlight_round : Icons.access_time,
+                    size: 18,
+                    color: isLateNight ? Colors.purple : Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    timeStr,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '(${entry.value}x)',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
