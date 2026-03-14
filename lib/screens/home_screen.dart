@@ -178,71 +178,78 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.description,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Chip(
-                        avatar: const Icon(Icons.restaurant, size: 16),
-                        label: Text(
-                          '${AppStrings.hunger}: ${entry.hungerLevel}/5',
-                          style: const TextStyle(fontSize: 12),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.description,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          avatar: const Icon(Icons.restaurant, size: 16),
+                          label: Text(
+                            '${AppStrings.hunger}: ${entry.hungerLevel}/5',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          visualDensity: VisualDensity.compact,
                         ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      const SizedBox(width: 8),
-                      ReasonChip(reason: entry.reason, compact: true),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Logged at ${DateFormat.jm().format(entry.createdAt)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.edit, size: 18),
-                        label: const Text(AppStrings.edit),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          final selectedDate = context.read<EatingProvider>().selectedDate;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AddEntryScreen(
-                                targetDate: selectedDate,
-                                entryToEdit: entry,
+                        ReasonChip(reason: entry.reason, compact: true),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Logged at ${DateFormat.jm().format(entry.createdAt)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text(AppStrings.edit),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            final selectedDate = context.read<EatingProvider>().selectedDate;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AddEntryScreen(
+                                  targetDate: selectedDate,
+                                  entryToEdit: entry,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                        label: const Text(AppStrings.delete, style: TextStyle(color: Colors.redAccent)),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          context.read<EatingProvider>().deleteEatingLog(entry.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text(AppStrings.entryDeleted)),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
+                            );
+                          },
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                          label: const Text(AppStrings.delete, style: TextStyle(color: Colors.redAccent)),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            context.read<EatingProvider>().deleteEatingLog(entry.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text(AppStrings.entryDeleted)),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             Positioned(
