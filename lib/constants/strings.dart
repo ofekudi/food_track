@@ -91,4 +91,17 @@ class AppStrings {
 
   // Days of week
   static const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Mindfulness timer
+  static const mindfulnessPausing = 'Taking a moment to pause...';
+  static const mindfulnessMessages = [
+    'Take a moment to notice how you\'re feeling...',
+    'Are you truly hungry, or is this something else?',
+    'Pause and check in with your body...',
+    'What do you really need right now?',
+    'Breathe and observe your thoughts...',
+    'Consider drinking water first',
+    'Avoid overeating to maintain healthy fat levels',
+    'Try setting a 20-minute timer before eating more',
+  ];
 }

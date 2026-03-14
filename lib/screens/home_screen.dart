@@ -9,6 +9,7 @@ import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
 import '../widgets/suggestion_tile.dart';
 import 'add_entry_screen.dart';
+import 'mindfulness_timer_screen.dart';
 import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
 
@@ -148,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddEntryScreen(targetDate: selectedDate),
+                    builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
                   ),
                 );
               },
@@ -379,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AddEntryScreen(targetDate: selectedDate),
+              builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
             ),
           );
         },
