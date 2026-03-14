@@ -59,7 +59,10 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   void _onReasonSelected(EatingReason reason) {
     setState(() {
       _selectedReason = reason;
-      if (_selectedHunger != null && _selectedHunger! <= 2 && reason == EatingReason.bored) {
+      final shouldIntervene = _selectedHunger != null &&
+          _selectedHunger! <= 2 &&
+          (reason == EatingReason.bored || reason == EatingReason.craving);
+      if (shouldIntervene) {
         _showIntervention = true;
       } else {
         _currentStep = 2;
