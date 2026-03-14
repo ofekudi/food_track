@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/eating_provider.dart';
 import '../models/eating_log.dart';
 import '../constants/strings.dart';
+import '../constants/theme.dart';
 import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
 import '../widgets/suggestion_tile.dart';
@@ -111,9 +112,20 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDescriptionStep = _currentStep == 2 && !_showIntervention;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? AppStrings.editEntry : AppStrings.logEating),
+        actions: isDescriptionStep
+            ? [
+                TextButton(
+                  onPressed: _descriptionController.text.trim().isNotEmpty
+                      ? _submitEntry
+                      : null,
+                  child: Text(_isEditing ? AppStrings.save : AppStrings.done),
+                ),
+              ]
+            : null,
       ),
       body: _showIntervention
           ? _buildInterventionScreen()
@@ -214,16 +226,6 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               );
             }).toList(),
           ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _currentStep = 0;
-              });
-            },
-            icon: const Icon(Icons.arrow_back),
-            label: const Text(AppStrings.backToHunger),
-          ),
         ],
       ),
     );
@@ -272,12 +274,12 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   }
 
   Widget _buildDescriptionStep() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 32),
+          const SizedBox(height: 12),
           Text(
             AppStrings.descriptionQuestion,
             style: Theme.of(context).textTheme.headlineMedium,
@@ -338,9 +340,19 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          _selectedReason!.displayName,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              AppTheme.reasonIcon(_selectedReason!.name),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _selectedReason!.displayName,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -348,24 +360,6 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                 ),
               ),
             ),
-          const Spacer(),
-          if (!_isEditing)
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _currentStep = 1;
-                });
-              },
-              icon: const Icon(Icons.arrow_back),
-              label: const Text(AppStrings.back),
-            ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: _descriptionController.text.trim().isNotEmpty
-                ? _submitEntry
-                : null,
-            child: Text(_isEditing ? AppStrings.save : AppStrings.done),
-          ),
         ],
       ),
     );
