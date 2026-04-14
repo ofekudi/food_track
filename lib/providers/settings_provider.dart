@@ -16,6 +16,7 @@ class SettingsProvider with ChangeNotifier {
   TimeOfDay? _kitchenClosedTime;
   String _stopEatingTitle = defaultStopEatingTitle;
   bool _stopEatingEnabled = false;
+  Future<void>? _loadFuture;
 
   TimeOfDay? get kitchenClosedTime => _stopEatingEnabled ? _kitchenClosedTime : null;
   String get stopEatingTitle => _stopEatingTitle;
@@ -31,7 +32,11 @@ class SettingsProvider with ChangeNotifier {
   ];
 
   SettingsProvider() {
-    _loadSettings();
+    _loadFuture = _loadSettings();
+  }
+
+  Future<void> ensureLoaded() async {
+    await (_loadFuture ??= _loadSettings());
   }
 
   Future<void> _loadSettings() async {

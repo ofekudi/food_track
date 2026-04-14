@@ -20,35 +20,46 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        _checkKitchenClosed();
-      }
-    });
-  }
+  static const int _dayResetMinutes = 5 * 60;
 
-  void _checkKitchenClosed() {
-    if (!mounted) return;
-
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-
-    if (!settingsProvider.stopEatingEnabled) return;
+  bool _shouldShowKitchenClosedReminder() {
+    final settingsProvider =
+        Provider.of<SettingsProvider>(context, listen: false);
+    if (!settingsProvider.stopEatingEnabled) return false;
 
     final kitchenClosedTime = settingsProvider.kitchenClosedTime;
-    final bannerTitle = settingsProvider.stopEatingTitle;
+    if (kitchenClosedTime == null) return false;
 
-    if (kitchenClosedTime != null) {
-      final now = TimeOfDay.now();
-      final nowMinutes = now.hour * 60 + now.minute;
-      final closedMinutes = kitchenClosedTime.hour * 60 + kitchenClosedTime.minute;
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final closedMinutes = kitchenClosedTime.hour * 60 + kitchenClosedTime.minute;
 
-      if (nowMinutes >= closedMinutes) {
-        _showKitchenClosedDialog(bannerTitle);
-      }
+    // Keep the "kitchen closed" window active overnight and reset it at 5:00 AM.
+    if (closedMinutes < _dayResetMinutes) {
+      return nowMinutes >= closedMinutes && nowMinutes < _dayResetMinutes;
     }
+
+    return nowMinutes >= closedMinutes || nowMinutes < _dayResetMinutes;
+  }
+
+  Future<void> _startAddFlow() async {
+    final settingsProvider = context.read<SettingsProvider>();
+    await settingsProvider.ensureLoaded();
+    if (!mounted) return;
+
+    final selectedDate = context.read<EatingProvider>().selectedDate;
+
+    if (_shouldShowKitchenClosedReminder()) {
+      _showKitchenClosedDialog(settingsProvider.stopEatingTitle);
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
+      ),
+    );
   }
 
   void _showKitchenClosedDialog(String title) {
@@ -360,15 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final selectedDate = context.read<EatingProvider>().selectedDate;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
-            ),
-          );
-        },
+        onPressed: _startAddFlow,
         child: const Icon(Icons.add),
       ),
     );
