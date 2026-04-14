@@ -175,7 +175,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         Expanded(
           child: _buildStatCard(
             value: '$_totalEntries',
-            label: 'entries',
+            label: AppStrings.totalEntries,
             icon: Icons.restaurant,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -184,7 +184,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         Expanded(
           child: _buildStatCard(
             value: _averageHunger.toStringAsFixed(1),
-            label: 'avg hunger',
+            label: AppStrings.avgHunger,
             icon: Icons.speed,
             color: _averageHunger >= 3 ? Colors.green : Colors.orange,
           ),
@@ -193,7 +193,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
         Expanded(
           child: _buildStatCard(
             value: '$_lateNightCount',
-            label: 'after 9pm',
+            label: AppStrings.lateNight,
             icon: Icons.nightlight_round,
             color: _lateNightCount > 0 ? Colors.purple : Colors.grey,
           ),
@@ -247,7 +247,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Why you ate',
+          AppStrings.whyYouEat,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -313,7 +313,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    '$_lowMindfulCount times you ate when not hungry',
+                    AppStrings.ateWhenNotHungry.replaceFirst('%d', '$_lowMindfulCount'),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -328,13 +328,15 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
   String _reasonLabel(String reason) {
     switch (reason) {
       case 'hungry':
-        return 'Hungry';
+        return AppStrings.reasonHungry;
       case 'bored':
-        return 'Bored';
+        return AppStrings.reasonBored;
       case 'craving':
-        return 'Craving';
+        return AppStrings.reasonCraving;
       case 'social':
-        return 'Social';
+        return AppStrings.reasonSocial;
+      case 'habit':
+        return AppStrings.reasonHabit;
       default:
         return reason;
     }
@@ -448,7 +450,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
 
     const startHour = 6;
     const endHour = 23;
-    const reasons = ['hungry', 'bored', 'craving', 'social'];
+    const reasons = ['hungry', 'bored', 'craving', 'social', 'habit'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,7 +565,7 @@ class _MealAnalyticsScreenState extends State<MealAnalyticsScreen> {
     if (total == 0) return '$timeStr: no entries';
 
     final parts = <String>[];
-    for (final reason in ['hungry', 'bored', 'craving', 'social']) {
+    for (final reason in ['hungry', 'bored', 'craving', 'social', 'habit']) {
       final count = hourData[reason] ?? 0;
       if (count > 0) {
         parts.add('${_reasonLabel(reason)}: $count');

@@ -11,11 +11,13 @@ import '../widgets/suggestion_tile.dart';
 class AddEntryScreen extends StatefulWidget {
   final DateTime targetDate;
   final EatingLog? entryToEdit;
+  final EatingReason? preselectedReason;
 
   const AddEntryScreen({
     super.key,
     required this.targetDate,
     this.entryToEdit,
+    this.preselectedReason,
   });
 
   @override
@@ -40,6 +42,8 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       _selectedReason = entry.reason;
       _descriptionController.text = entry.description;
       _currentStep = 2;
+    } else if (widget.preselectedReason != null) {
+      _selectedReason = widget.preselectedReason;
     }
   }
 
@@ -52,7 +56,19 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   void _onHungerSelected(int level) {
     setState(() {
       _selectedHunger = level;
-      _currentStep = 1;
+      if (_selectedReason != null) {
+        final shouldIntervene =
+            level <= 2 &&
+            (_selectedReason == EatingReason.bored ||
+                _selectedReason == EatingReason.craving);
+        if (shouldIntervene) {
+          _showIntervention = true;
+        } else {
+          _currentStep = 2;
+        }
+      } else {
+        _currentStep = 1;
+      }
     });
   }
 

@@ -16,6 +16,7 @@ class AppStrings {
   static const reasonBored = 'Bored';
   static const reasonCraving = 'Craving';
   static const reasonSocial = 'Social';
+  static const reasonHabit = 'Habit';
   static const backToHunger = 'Back to hunger';
 
   // Description
@@ -45,7 +46,6 @@ class AppStrings {
   static const kitchenClosedQuestion = 'Are you hungry or just looking for a snack?';
   static const tryTheseInstead = 'Try These Instead';
   static const gotIt = 'Got It';
-  static const habit = 'Habit';
 
   // Analytics
   static const weeklyInsights = 'Insights';

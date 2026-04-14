@@ -37,6 +37,7 @@ class AppTheme {
     'bored': Colors.orange,
     'craving': Colors.pink,
     'social': Colors.blue,
+    'habit': Colors.teal,
   };
 
   // Reason icons
@@ -50,6 +51,8 @@ class AppTheme {
         return Icons.favorite;
       case 'social':
         return Icons.people;
+      case 'habit':
+        return Icons.repeat;
       default:
         return Icons.help_outline;
     }

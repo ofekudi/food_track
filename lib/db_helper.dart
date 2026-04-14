@@ -188,6 +188,7 @@ class DBHelper {
       'bored': 0,
       'craving': 0,
       'social': 0,
+      'habit': 0,
     };
 
     for (var row in results) {
@@ -374,6 +375,7 @@ class DBHelper {
         'bored': 0,
         'craving': 0,
         'social': 0,
+        'habit': 0,
       };
     }
 

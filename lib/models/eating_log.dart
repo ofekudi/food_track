@@ -1,22 +1,26 @@
 import 'package:intl/intl.dart';
+import '../constants/strings.dart';
 
 /// Reason tags for eating
 enum EatingReason {
   hungry,
   bored,
   craving,
-  social;
+  social,
+  habit;
 
   String get displayName {
     switch (this) {
       case EatingReason.hungry:
-        return 'Hungry';
+        return AppStrings.reasonHungry;
       case EatingReason.bored:
-        return 'Bored';
+        return AppStrings.reasonBored;
       case EatingReason.craving:
-        return 'Craving';
+        return AppStrings.reasonCraving;
       case EatingReason.social:
-        return 'Social';
+        return AppStrings.reasonSocial;
+      case EatingReason.habit:
+        return AppStrings.reasonHabit;
     }
   }
 

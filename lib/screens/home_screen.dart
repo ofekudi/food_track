@@ -7,7 +7,6 @@ import '../models/eating_log.dart';
 import '../constants/strings.dart';
 import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
-import '../widgets/suggestion_tile.dart';
 import 'add_entry_screen.dart';
 import 'mindfulness_timer_screen.dart';
 import 'meal_analytics_screen.dart';
@@ -82,7 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AddEntryScreen(targetDate: selectedDate),
+                            builder: (context) => AddEntryScreen(
+                              targetDate: selectedDate,
+                              preselectedReason: EatingReason.hungry,
+                            ),
                           ),
                         );
                       },
@@ -91,16 +93,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-                        _showBoredSuggestions();
+                        final selectedDate = context.read<EatingProvider>().selectedDate;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddEntryScreen(
+                              targetDate: selectedDate,
+                              preselectedReason: EatingReason.bored,
+                            ),
+                          ),
+                        );
                       },
                       child: const Text(AppStrings.reasonBored),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-                        _showBoredSuggestions();
+                        final selectedDate = context.read<EatingProvider>().selectedDate;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddEntryScreen(
+                              targetDate: selectedDate,
+                              preselectedReason: EatingReason.habit,
+                            ),
+                          ),
+                        );
                       },
-                      child: const Text(AppStrings.habit),
+                      child: const Text(AppStrings.reasonHabit),
                     ),
                   ],
                 ),
@@ -118,48 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
-            ),
-          ],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBoredSuggestions() {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          icon: Icon(
-            Icons.lightbulb_outline,
-            color: Theme.of(dialogContext).colorScheme.primary,
-            size: 40,
-          ),
-          title: const Text(AppStrings.tryTheseInstead),
-          content: const SuggestionsList(compact: true),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                final selectedDate = context.read<EatingProvider>().selectedDate;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
-                  ),
-                );
-              },
-              child: const Text(AppStrings.logAnyway),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(AppStrings.gotIt),
             ),
           ],
           shape: RoundedRectangleBorder(
