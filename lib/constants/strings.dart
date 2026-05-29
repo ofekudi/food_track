@@ -21,8 +21,12 @@ class AppStrings {
 
   // Description
   static const descriptionQuestion = 'What are you eating?';
-  static const descriptionHint = 'Just a simple description is fine';
+  static const descriptionHint = 'Add a row for each food or drink';
   static const descriptionPlaceholder = 'e.g., "3 schnitzels" or "handful of chips"';
+  static const amountPlaceholder = 'Amount'; // e.g. "one glass", "4 items"
+  static const foodPlaceholder = 'Food'; // e.g. "chips", "water"
+  static const addItem = 'Add item';
+  static const removeItem = 'Remove item';
 
   // Intervention
   static const interventionTitle = 'Not very hungry?';

@@ -8,6 +8,17 @@ import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
 import '../widgets/suggestion_tile.dart';
 
+/// Holds the two controllers for a single food item row (amount + food).
+class _ItemRow {
+  final TextEditingController amount = TextEditingController();
+  final TextEditingController food = TextEditingController();
+
+  void dispose() {
+    amount.dispose();
+    food.dispose();
+  }
+}
+
 class AddEntryScreen extends StatefulWidget {
   final DateTime targetDate;
   final EatingLog? entryToEdit;
@@ -28,10 +39,14 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   int _currentStep = 0;
   int? _selectedHunger;
   EatingReason? _selectedReason;
-  final _descriptionController = TextEditingController();
+  final List<_ItemRow> _itemRows = [];
   bool _showIntervention = false;
 
   bool get _isEditing => widget.entryToEdit != null;
+
+  /// True once at least one row has a non-empty food, so the entry can be saved.
+  bool get _hasValidItems =>
+      _itemRows.any((r) => r.food.text.trim().isNotEmpty);
 
   @override
   void initState() {
@@ -40,17 +55,66 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       final entry = widget.entryToEdit!;
       _selectedHunger = entry.hungerLevel;
       _selectedReason = entry.reason;
-      _descriptionController.text = entry.description;
+      _seedRowsFromDescription(entry.description);
       _currentStep = 2;
-    } else if (widget.preselectedReason != null) {
-      _selectedReason = widget.preselectedReason;
+    } else {
+      if (widget.preselectedReason != null) {
+        _selectedReason = widget.preselectedReason;
+      }
+      _itemRows.add(_ItemRow());
+    }
+  }
+
+  /// Splits a stored comma-joined description back into rows (one per segment,
+  /// kept whole in the food field). Always leaves at least one row.
+  void _seedRowsFromDescription(String description) {
+    final segments = description
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (segments.isEmpty) {
+      _itemRows.add(_ItemRow());
+      return;
+    }
+    for (final segment in segments) {
+      final row = _ItemRow();
+      row.food.text = segment;
+      _itemRows.add(row);
     }
   }
 
   @override
   void dispose() {
-    _descriptionController.dispose();
+    for (final row in _itemRows) {
+      row.dispose();
+    }
     super.dispose();
+  }
+
+  void _addRow() {
+    setState(() => _itemRows.add(_ItemRow()));
+  }
+
+  void _removeRow(int index) {
+    setState(() {
+      _itemRows[index].dispose();
+      _itemRows.removeAt(index);
+    });
+  }
+
+  /// Builds the comma-joined summary stored in `description` from the rows.
+  /// Rows with an empty food are dropped; amount + food are joined with a space.
+  String _composeDescription() {
+    return _itemRows
+        .map((r) {
+          final amount = r.amount.text.trim();
+          final food = r.food.text.trim();
+          if (food.isEmpty) return '';
+          return amount.isEmpty ? food : '$amount $food';
+        })
+        .where((s) => s.isNotEmpty)
+        .join(', ');
   }
 
   void _onHungerSelected(int level) {
@@ -98,7 +162,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   }
 
   Future<void> _submitEntry() async {
-    final description = _descriptionController.text.trim();
+    final description = _composeDescription();
     if (description.isEmpty || _selectedHunger == null || _selectedReason == null) {
       return;
     }
@@ -138,9 +202,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         actions: isDescriptionStep
             ? [
                 TextButton(
-                  onPressed: _descriptionController.text.trim().isNotEmpty
-                      ? _submitEntry
-                      : null,
+                  onPressed: _hasValidItems ? _submitEntry : null,
                   child: Text(_isEditing ? AppStrings.save : AppStrings.done),
                 ),
               ]
@@ -313,18 +375,67 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          TextField(
-            controller: _descriptionController,
-            decoration: InputDecoration(
-              hintText: AppStrings.descriptionPlaceholder,
-              border: const OutlineInputBorder(),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ...List.generate(_itemRows.length, (index) {
+            final row = _itemRows[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: row.amount,
+                      decoration: InputDecoration(
+                        hintText: AppStrings.amountPlaceholder,
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        isDense: true,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: row.food,
+                      decoration: InputDecoration(
+                        hintText: AppStrings.foodPlaceholder,
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        isDense: true,
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      autofocus: index == 0,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 40,
+                    child: _itemRows.length > 1
+                        ? IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            tooltip: AppStrings.removeItem,
+                            onPressed: () => _removeRow(index),
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _addRow,
+              icon: const Icon(Icons.add),
+              label: const Text(AppStrings.addItem),
             ),
-            textCapitalization: TextCapitalization.sentences,
-            maxLines: 2,
-            autofocus: true,
-            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
           if (_selectedHunger != null && _selectedReason != null)
