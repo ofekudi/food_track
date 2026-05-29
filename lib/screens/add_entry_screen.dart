@@ -8,14 +8,18 @@ import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
 import '../widgets/suggestion_tile.dart';
 
-/// Holds the two controllers for a single food item row (amount + food).
+/// Holds the controllers and focus nodes for a single food item row.
 class _ItemRow {
   final TextEditingController amount = TextEditingController();
   final TextEditingController food = TextEditingController();
+  final FocusNode amountFocus = FocusNode();
+  final FocusNode foodFocus = FocusNode();
 
   void dispose() {
     amount.dispose();
     food.dispose();
+    amountFocus.dispose();
+    foodFocus.dispose();
   }
 }
 
@@ -93,7 +97,12 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   }
 
   void _addRow() {
-    setState(() => _itemRows.add(_ItemRow()));
+    final row = _ItemRow();
+    setState(() => _itemRows.add(row));
+    // Move the cursor into the new row's amount field once it's laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) row.amountFocus.requestFocus();
+    });
   }
 
   void _removeRow(int index) {
@@ -385,6 +394,10 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                     flex: 2,
                     child: TextField(
                       controller: row.amount,
+                      focusNode: row.amountFocus,
+                      autofocus: index == 0,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => row.foodFocus.requestFocus(),
                       decoration: InputDecoration(
                         hintText: AppStrings.amountPlaceholder,
                         border: const OutlineInputBorder(),
@@ -401,6 +414,9 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                     flex: 3,
                     child: TextField(
                       controller: row.food,
+                      focusNode: row.foodFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _addRow(),
                       decoration: InputDecoration(
                         hintText: AppStrings.foodPlaceholder,
                         border: const OutlineInputBorder(),
@@ -410,7 +426,6 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                         isDense: true,
                       ),
                       textCapitalization: TextCapitalization.sentences,
-                      autofocus: index == 0,
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
