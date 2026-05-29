@@ -23,7 +23,7 @@ class DBHelper {
     String path = join(await getDatabasesPath(), 'food_tracking.db');
     return await openDatabase(
       path,
-      version: 2, // Bump version for migration
+      version: 3, // v3: add is_miss column
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -37,7 +37,8 @@ class DBHelper {
         hunger_level INTEGER NOT NULL,
         reason TEXT NOT NULL,
         entry_date TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        is_miss INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('CREATE INDEX idx_eating_logs_entry_date ON eating_logs(entry_date);');
@@ -88,6 +89,16 @@ class DBHelper {
         // Tables might not exist
       }
     }
+
+    if (oldVersion < 3) {
+      // Additive: flag for quick-logged "miss" entries. Existing rows default to 0.
+      try {
+        await db.execute(
+            'ALTER TABLE eating_logs ADD COLUMN is_miss INTEGER NOT NULL DEFAULT 0');
+      } catch (e) {
+        // Column may already exist; ignore.
+      }
+    }
   }
 
   // === Eating Log Methods ===
@@ -112,6 +123,34 @@ class DBHelper {
         'reason': reason.name,
         'entry_date': entryDateStr,
         'created_at': now.toIso8601String(),
+        'is_miss': 0,
+      },
+    );
+
+    return id;
+  }
+
+  /// Quick-log a "miss" — the user ate but forgot to document it mindfully.
+  /// Only the typed [description] matters; hunger/reason are neutral placeholders.
+  Future<String> addMiss({
+    required String description,
+    required DateTime entryDate,
+  }) async {
+    final Database db = await database;
+    final String id = uuid.v4();
+    final now = DateTime.now();
+    final String entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
+
+    await db.insert(
+      'eating_logs',
+      {
+        'id': id,
+        'description': description,
+        'hunger_level': 0, // N/A for a miss
+        'reason': 'hungry', // placeholder, ignored for misses
+        'entry_date': entryDateStr,
+        'created_at': now.toIso8601String(),
+        'is_miss': 1,
       },
     );
 
@@ -180,6 +219,7 @@ class DBHelper {
       SELECT reason, COUNT(*) as count
       FROM eating_logs
       WHERE entry_date >= ? AND entry_date <= ?
+      AND is_miss = 0
       GROUP BY reason
     ''', [startDateStr, endDateStr]);
 
@@ -209,6 +249,7 @@ class DBHelper {
       SELECT AVG(hunger_level) as avg_hunger
       FROM eating_logs
       WHERE entry_date >= ? AND entry_date <= ?
+      AND is_miss = 0
     ''', [startDateStr, endDateStr]);
 
     if (result.isNotEmpty && result.first['avg_hunger'] != null) {
@@ -285,6 +326,7 @@ class DBHelper {
       SELECT COUNT(*) as count
       FROM eating_logs
       WHERE entry_date >= ? AND entry_date <= ?
+      AND is_miss = 0
       AND hunger_level <= 2
       AND reason != 'hungry'
     ''', [startDateStr, endDateStr]);
@@ -302,6 +344,7 @@ class DBHelper {
       SELECT hunger_level, COUNT(*) as count
       FROM eating_logs
       WHERE entry_date >= ? AND entry_date <= ?
+      AND is_miss = 0
       GROUP BY hunger_level
       ORDER BY hunger_level
     ''', [startDateStr, endDateStr]);
@@ -363,6 +406,7 @@ class DBHelper {
              COUNT(*) as count
       FROM eating_logs
       WHERE entry_date >= ? AND entry_date <= ?
+      AND is_miss = 0
       GROUP BY hour, reason
       ORDER BY hour, reason
     ''', [startDateStr, endDateStr]);

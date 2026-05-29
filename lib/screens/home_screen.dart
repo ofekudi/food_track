@@ -62,6 +62,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _logMiss() async {
+    final eatingProvider = context.read<EatingProvider>();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => const _MissEntryDialog(),
+    );
+    if (text != null && text.trim().isNotEmpty) {
+      await eatingProvider.addMiss(
+        description: text.trim(),
+        entryDate: eatingProvider.selectedDate,
+      );
+    }
+  }
+
   void _showKitchenClosedDialog(String title) {
     showDialog(
       context: context,
@@ -179,21 +193,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        Chip(
-                          avatar: const Icon(Icons.restaurant, size: 16),
-                          label: Text(
-                            '${AppStrings.hunger}: ${entry.hungerLevel}/5',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          visualDensity: VisualDensity.compact,
+                    if (entry.isMiss)
+                      Chip(
+                        avatar: const Icon(Icons.close, size: 16),
+                        label: const Text(
+                          AppStrings.loggedAsMiss,
+                          style: TextStyle(fontSize: 12),
                         ),
-                        ReasonChip(reason: entry.reason, compact: true),
-                      ],
-                    ),
+                        visualDensity: VisualDensity.compact,
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Chip(
+                            avatar: const Icon(Icons.restaurant, size: 16),
+                            label: Text(
+                              '${AppStrings.hunger}: ${entry.hungerLevel}/5',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          ReasonChip(reason: entry.reason, compact: true),
+                        ],
+                      ),
                     const SizedBox(height: 12),
                     Text(
                       'Logged at ${DateFormat.jm().format(entry.createdAt)}',
@@ -207,6 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       runSpacing: 8,
                       alignment: WrapAlignment.spaceBetween,
                       children: [
+                        if (!entry.isMiss)
                         ElevatedButton.icon(
                           icon: const Icon(Icons.edit, size: 18),
                           label: const Text(AppStrings.edit),
@@ -297,6 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return Column(
             children: [
               _buildOrderBanner(context),
+              _buildMissStats(context, eatingProvider),
               // Date navigation
               Padding(
                 padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
@@ -371,9 +397,24 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _startAddFlow,
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'miss',
+            onPressed: _logMiss,
+            tooltip: AppStrings.logMiss,
+            backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+            foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+            child: const Icon(Icons.close),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'add',
+            onPressed: _startAddFlow,
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -400,6 +441,71 @@ class _HomeScreenState extends State<HomeScreen> {
               color: theme.colorScheme.onPrimaryContainer,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Two engagement stat boxes at the top of the home page.
+  Widget _buildMissStats(BuildContext context, EatingProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatBox(
+              context,
+              value: '${provider.last7DaysMissCount}',
+              label: AppStrings.last7DaysMisses,
+              icon: Icons.error_outline,
+              color: Colors.orange,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatBox(
+              context,
+              value: '${provider.daysWithoutMissStreak}',
+              label: AppStrings.missFreeStreak,
+              icon: Icons.local_fire_department,
+              color: Colors.green,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatBox(
+    BuildContext context, {
+    required String value,
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
           ),
         ],
       ),
@@ -445,12 +551,22 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            leading: HungerIndicator(level: log.hungerLevel),
+            leading: log.isMiss
+                ? CircleAvatar(
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    foregroundColor:
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                    child: const Icon(Icons.close),
+                  )
+                : HungerIndicator(level: log.hungerLevel),
             title: Text(
               log.description,
               style: const TextStyle(fontSize: 16),
             ),
-            subtitle: ReasonLabel(reason: log.reason),
+            subtitle: log.isMiss
+                ? const Text(AppStrings.loggedAsMiss)
+                : ReasonLabel(reason: log.reason),
             trailing: Text(
               DateFormat.jm().format(log.createdAt),
               style: TextStyle(
@@ -464,6 +580,54 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Quick "missed meal" dialog. Owns its own controller so it's disposed safely
+/// with the dialog's State (never while the route is still animating out).
+class _MissEntryDialog extends StatefulWidget {
+  const _MissEntryDialog();
+
+  @override
+  State<_MissEntryDialog> createState() => _MissEntryDialogState();
+}
+
+class _MissEntryDialogState extends State<_MissEntryDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(AppStrings.missDialogTitle),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          hintText: AppStrings.missDialogHint,
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.cancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text(AppStrings.save),
+        ),
+      ],
     );
   }
 }

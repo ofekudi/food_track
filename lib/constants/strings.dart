@@ -52,6 +52,15 @@ class AppStrings {
   static const hunger = 'Hunger';
   static const reason = 'Reason';
 
+  // Miss logging + home stat boxes
+  static const logMiss = 'Forgot to log it';
+  static const missDialogTitle = 'Log a missed meal';
+  static const missDialogHint = 'What did you eat?';
+  static const loggedAsMiss = 'Logged as a miss';
+  static const cancel = 'Cancel';
+  static const last7DaysMisses = '7-Day Misses';
+  static const missFreeStreak = 'Miss-Free Streak';
+
   // Kitchen closed
   static const kitchenClosedQuestion = 'Are you hungry or just looking for a snack?';
   static const tryTheseInstead = 'Try These Instead';

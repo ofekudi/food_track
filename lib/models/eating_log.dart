@@ -39,6 +39,7 @@ class EatingLog {
   final EatingReason reason;
   final DateTime entryDate;
   final DateTime createdAt; // For time analytics
+  final bool isMiss; // Quick-logged "forgot to document" entry (no hunger/reason)
 
   EatingLog({
     required this.id,
@@ -47,6 +48,7 @@ class EatingLog {
     required this.reason,
     required this.entryDate,
     required this.createdAt,
+    this.isMiss = false,
   });
 
   factory EatingLog.fromMap(Map<String, dynamic> map) {
@@ -72,6 +74,7 @@ class EatingLog {
       reason: EatingReason.fromString(map['reason'] as String? ?? 'hungry'),
       entryDate: parsedEntryDate,
       createdAt: DateTime.parse(map['created_at'] as String),
+      isMiss: (map['is_miss'] as int? ?? 0) == 1,
     );
   }
 
@@ -83,6 +86,7 @@ class EatingLog {
       'reason': reason.name,
       'entry_date': DateFormat('yyyy-MM-dd').format(entryDate),
       'created_at': createdAt.toIso8601String(),
+      'is_miss': isMiss ? 1 : 0,
     };
   }
 
