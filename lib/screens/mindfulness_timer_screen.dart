@@ -69,6 +69,60 @@ class _MindfulnessTimerScreenState extends State<MindfulnessTimerScreen>
     super.dispose();
   }
 
+  /// "Log → Breathe → Eat" with the current step (Breathe) emphasized.
+  Widget _buildSequenceTitle(ThemeData theme) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _stepText(theme, AppStrings.stepLog),
+        _arrow(theme),
+        _stepText(theme, AppStrings.stepBreathe, active: true),
+        _arrow(theme),
+        _stepText(theme, AppStrings.stepEat),
+      ],
+    );
+  }
+
+  Widget _stepText(ThemeData theme, String label, {bool active = false}) {
+    if (active) {
+      // Current step — a filled pill so it clearly pops.
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+    return Text(
+      label,
+      style: theme.textTheme.titleLarge?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _arrow(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        '→',
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -80,6 +134,8 @@ class _MindfulnessTimerScreenState extends State<MindfulnessTimerScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Sequence title — "Log → Breathe → Eat", current step emphasized
+              _buildSequenceTitle(theme),
               const Spacer(),
               // Circular countdown
               SizedBox(

@@ -296,6 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return Column(
             children: [
+              _buildOrderBanner(context),
               // Date navigation
               Padding(
                 padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
@@ -373,6 +374,34 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _startAddFlow,
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  /// Full-width banner under the app bar priming the "Log → Eat" order.
+  Widget _buildOrderBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      color: theme.colorScheme.primaryContainer,
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.restaurant_menu,
+            size: 20,
+            color: theme.colorScheme.onPrimaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            AppStrings.orderTagline,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

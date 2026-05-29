@@ -4,6 +4,12 @@ class AppStrings {
   // App
   static const appName = 'Mindful Eating';
 
+  // Order priming ("log before you eat")
+  static const orderTagline = 'Log → Eat'; // home AppBar subtitle
+  static const stepLog = 'Log';
+  static const stepBreathe = 'Breathe';
+  static const stepEat = 'Eat';
+
   // Hunger levels
   static const hungerQuestion = 'How hungry are you?';
   static const hungerHint = 'Tap a number from 1 (not hungry) to 5 (very hungry)';
