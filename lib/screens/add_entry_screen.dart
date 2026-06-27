@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/eating_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/eating_log.dart';
 import '../constants/strings.dart';
 import '../constants/theme.dart';
@@ -46,6 +49,10 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   final List<_ItemRow> _itemRows = [];
   bool _showIntervention = false;
 
+  /// While true the CTA is a spinner (mindful pause) and submitting is blocked.
+  bool _ctaPaused = false;
+  Timer? _ctaPauseTimer;
+
   bool get _isEditing => widget.entryToEdit != null;
 
   /// True once at least one row has a non-empty food, so the entry can be saved.
@@ -69,8 +76,9 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     }
   }
 
-  /// Splits a stored comma-joined description back into rows (one per segment,
-  /// kept whole in the food field). Always leaves at least one row.
+  /// Splits a stored comma-joined description back into rows using the same
+  /// rules typing follows: comma separates items, and a leading numeric token
+  /// (before the first space) is the amount. Always leaves at least one row.
   void _seedRowsFromDescription(String description) {
     final segments = description
         .split(',')
@@ -83,17 +91,49 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     }
     for (final segment in segments) {
       final row = _ItemRow();
-      row.food.text = segment;
+      final spaceIndex = segment.indexOf(' ');
+      // Only peel off a leading amount when it starts with a digit, so phrases
+      // like "handful of chips" stay whole in the food field.
+      if (spaceIndex > 0 &&
+          RegExp(r'^\d').hasMatch(segment.substring(0, spaceIndex))) {
+        row.amount.text = segment.substring(0, spaceIndex);
+        row.food.text = segment.substring(spaceIndex + 1).trim();
+      } else {
+        row.food.text = segment;
+      }
       _itemRows.add(row);
     }
   }
 
   @override
   void dispose() {
+    _ctaPauseTimer?.cancel();
     for (final row in _itemRows) {
       row.dispose();
     }
     super.dispose();
+  }
+
+  /// Moves to the description step and starts the mindful pause on the CTA.
+  void _goToDescriptionStep() {
+    setState(() {
+      _showIntervention = false;
+      _currentStep = 2;
+    });
+    _startCtaPause();
+  }
+
+  void _startCtaPause() {
+    _ctaPauseTimer?.cancel();
+    final seconds = context.read<SettingsProvider>().pauseSeconds;
+    if (seconds <= 0) {
+      setState(() => _ctaPaused = false);
+      return;
+    }
+    setState(() => _ctaPaused = true);
+    _ctaPauseTimer = Timer(Duration(seconds: seconds), () {
+      if (mounted) setState(() => _ctaPaused = false);
+    });
   }
 
   void _addRow() {
@@ -103,6 +143,46 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) row.amountFocus.requestFocus();
     });
+  }
+
+  /// Inserts a fresh row right after [index] and focuses its amount field.
+  void _addRowAfter(int index) {
+    final row = _ItemRow();
+    setState(() => _itemRows.insert(index + 1, row));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) row.amountFocus.requestFocus();
+    });
+  }
+
+  /// In the amount field: a space jumps to the food field, a comma breaks to a
+  /// new row. The triggering character is stripped from the value.
+  void _onAmountChanged(int index, String value) {
+    if (value.contains(',')) {
+      _itemRows[index].amount.text = value.replaceAll(',', '').trim();
+      _addRowAfter(index);
+      return;
+    }
+    if (value.contains(' ')) {
+      final cleaned = value.replaceAll(' ', '');
+      final row = _itemRows[index];
+      row.amount.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+      row.foodFocus.requestFocus();
+      return;
+    }
+    setState(() {});
+  }
+
+  /// In the food field: a comma breaks to a new row. The comma is stripped.
+  void _onFoodChanged(int index, String value) {
+    if (value.contains(',')) {
+      _itemRows[index].food.text = value.replaceAll(',', '').trim();
+      _addRowAfter(index);
+      return;
+    }
+    setState(() {});
   }
 
   void _removeRow(int index) {
@@ -127,43 +207,35 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   }
 
   void _onHungerSelected(int level) {
-    setState(() {
-      _selectedHunger = level;
-      if (_selectedReason != null) {
-        final shouldIntervene =
-            level <= 2 &&
-            (_selectedReason == EatingReason.bored ||
-                _selectedReason == EatingReason.craving);
-        if (shouldIntervene) {
-          _showIntervention = true;
-        } else {
-          _currentStep = 2;
-        }
+    setState(() => _selectedHunger = level);
+    if (_selectedReason != null) {
+      final shouldIntervene = level <= 2 &&
+          (_selectedReason == EatingReason.bored ||
+              _selectedReason == EatingReason.craving);
+      if (shouldIntervene) {
+        setState(() => _showIntervention = true);
       } else {
-        _currentStep = 1;
+        _goToDescriptionStep();
       }
-    });
+    } else {
+      setState(() => _currentStep = 1);
+    }
   }
 
   void _onReasonSelected(EatingReason reason) {
-    setState(() {
-      _selectedReason = reason;
-      final shouldIntervene = _selectedHunger != null &&
-          _selectedHunger! <= 2 &&
-          (reason == EatingReason.bored || reason == EatingReason.craving);
-      if (shouldIntervene) {
-        _showIntervention = true;
-      } else {
-        _currentStep = 2;
-      }
-    });
+    setState(() => _selectedReason = reason);
+    final shouldIntervene = _selectedHunger != null &&
+        _selectedHunger! <= 2 &&
+        (reason == EatingReason.bored || reason == EatingReason.craving);
+    if (shouldIntervene) {
+      setState(() => _showIntervention = true);
+    } else {
+      _goToDescriptionStep();
+    }
   }
 
   void _onProceedAnyway() {
-    setState(() {
-      _showIntervention = false;
-      _currentStep = 2;
-    });
+    _goToDescriptionStep();
   }
 
   void _onDismissIntervention() {
@@ -210,10 +282,20 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       appBar: AppBar(
         actions: isDescriptionStep
             ? [
-                TextButton(
-                  onPressed: _hasValidItems ? _submitEntry : null,
-                  child: Text(_isEditing ? AppStrings.save : AppStrings.done),
-                ),
+                if (_ctaPaused)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  TextButton(
+                    onPressed: _hasValidItems ? _submitEntry : null,
+                    child: Text(_isEditing ? AppStrings.save : AppStrings.done),
+                  ),
               ]
             : null,
       ),
@@ -406,7 +488,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                             Theme.of(context).colorScheme.surfaceContainerHighest,
                         isDense: true,
                       ),
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (value) => _onAmountChanged(index, value),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -416,7 +498,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                       controller: row.food,
                       focusNode: row.foodFocus,
                       textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _addRow(),
+                      onSubmitted: (_) => _addRowAfter(index),
                       decoration: InputDecoration(
                         hintText: AppStrings.foodPlaceholder,
                         border: const OutlineInputBorder(),
@@ -426,7 +508,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                         isDense: true,
                       ),
                       textCapitalization: TextCapitalization.sentences,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (value) => _onFoodChanged(index, value),
                     ),
                   ),
                   SizedBox(

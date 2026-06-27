@@ -60,6 +60,7 @@ class AppStrings {
   static const cancel = 'Cancel';
   static const last7DaysMisses = '7-Day Misses';
   static const missFreeStreak = 'Miss-Free Streak';
+  static const last7DaysTrend = 'Misses per day';
 
   // Kitchen closed
   static const kitchenClosedQuestion = 'Are you hungry or just looking for a snack?';
@@ -96,6 +97,11 @@ class AppStrings {
   static const preferences = 'Preferences';
   static const kitchenClosed = 'Kitchen Closed';
   static const kitchenClosedSubtitle = 'Configure late-night reminder';
+  static const pauseTimer = 'Mindful pause';
+  static const pauseTimerSubtitle = 'Seconds to wait before you can log';
+  static const pauseTimerDialogTitle = 'Pause before logging';
+  static const seconds = 'seconds';
+  static const off = 'Off';
   static const enabled = 'Enabled';
   static const showReminderSubtitle = 'Show reminder after this time';
   static const time = 'Time';

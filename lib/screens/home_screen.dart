@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +10,6 @@ import '../constants/strings.dart';
 import '../widgets/hunger_indicator.dart';
 import '../widgets/reason_chip.dart';
 import 'add_entry_screen.dart';
-import 'mindfulness_timer_screen.dart';
 import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
 
@@ -57,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MindfulnessTimerScreen(targetDate: selectedDate),
+        builder: (context) => AddEntryScreen(targetDate: selectedDate),
       ),
     );
   }
@@ -447,31 +448,66 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Two engagement stat boxes at the top of the home page.
+  /// Two engagement stat boxes plus a 7-day miss trend at the top of the page.
   Widget _buildMissStats(BuildContext context, EatingProvider provider) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _buildStatBox(
-              context,
-              value: '${provider.last7DaysMissCount}',
-              label: AppStrings.last7DaysMisses,
-              icon: Icons.error_outline,
-              color: Colors.orange,
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatBox(
+                  context,
+                  value: '${provider.last7DaysMissCount}',
+                  label: AppStrings.last7DaysMisses,
+                  icon: Icons.error_outline,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatBox(
+                  context,
+                  value: '${provider.daysWithoutMissStreak}',
+                  label: AppStrings.missFreeStreak,
+                  icon: Icons.local_fire_department,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildMissTrend(context, provider.last7DaysMissCountsByDay),
+        ],
+      ),
+    );
+  }
+
+  /// Compact line chart of misses per day over the last 7 days (oldest → today)
+  /// with the per-day nodes linked, so the trend across good and bad days
+  /// reads at a glance.
+  Widget _buildMissTrend(BuildContext context, List<int> counts) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.last7DaysTrend,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatBox(
-              context,
-              value: '${provider.daysWithoutMissStreak}',
-              label: AppStrings.missFreeStreak,
-              icon: Icons.local_fire_department,
-              color: Colors.green,
-            ),
-          ),
+          const SizedBox(height: 12),
+          _MissTrendChart(counts: counts),
         ],
       ),
     );
@@ -582,6 +618,184 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+}
+
+/// Small connected line chart of misses per day (oldest → today). Nodes are
+/// linked by a line so the up/down trend is visible without any tooltip.
+class _MissTrendChart extends StatelessWidget {
+  final List<int> counts;
+
+  const _MissTrendChart({required this.counts});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayLabels = List.generate(counts.length, (i) {
+      final day = today.subtract(Duration(days: counts.length - 1 - i));
+      return DateFormat('EEE').format(day)[0];
+    });
+
+    return SizedBox(
+      height: 84,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _MissTrendPainter(
+          counts: counts,
+          dayLabels: dayLabels,
+          lineColor: Colors.orange,
+          mutedColor: theme.colorScheme.outlineVariant,
+          todayColor: theme.colorScheme.primary,
+          countStyle: theme.textTheme.labelMedium?.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ) ??
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          labelStyle: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ) ??
+              const TextStyle(fontSize: 11),
+          todayLabelStyle: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ) ??
+              TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary),
+        ),
+      ),
+    );
+  }
+}
+
+class _MissTrendPainter extends CustomPainter {
+  final List<int> counts;
+  final List<String> dayLabels;
+  final Color lineColor;
+  final Color mutedColor;
+  final Color todayColor;
+  final TextStyle countStyle;
+  final TextStyle labelStyle;
+  final TextStyle todayLabelStyle;
+
+  _MissTrendPainter({
+    required this.counts,
+    required this.dayLabels,
+    required this.lineColor,
+    required this.mutedColor,
+    required this.todayColor,
+    required this.countStyle,
+    required this.labelStyle,
+    required this.todayLabelStyle,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (counts.isEmpty) return;
+
+    const double topReserve = 26; // room for the count above each node
+    const double bottomReserve = 18; // room for the weekday label
+    const double sideInset = 12; // keep edge nodes off the border
+    final double plotTop = topReserve;
+    final double plotBottom = size.height - bottomReserve;
+    final double plotWidth = size.width - 2 * sideInset;
+    final int n = counts.length;
+    final int maxCount = counts.fold<int>(0, (m, v) => v > m ? v : m);
+    final int todayIndex = n - 1;
+
+    double xFor(int i) =>
+        n == 1 ? size.width / 2 : sideInset + plotWidth * i / (n - 1);
+    double yFor(int i) {
+      final pct = maxCount > 0 ? counts[i] / maxCount : 0.0;
+      return plotBottom - pct * (plotBottom - plotTop);
+    }
+
+    // Connecting line through all nodes.
+    final linePaint = Paint()
+      ..color = lineColor.withValues(alpha: 0.7)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final path = Path();
+    for (int i = 0; i < n; i++) {
+      final x = xFor(i);
+      final y = yFor(i);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, linePaint);
+
+    // Nodes + count labels + day labels.
+    for (int i = 0; i < n; i++) {
+      final x = xFor(i);
+      final y = yFor(i);
+      final isToday = i == todayIndex;
+      final hasMiss = counts[i] > 0;
+      final nodeColor = hasMiss ? lineColor : mutedColor;
+
+      // Node: filled dot, with a ring for today.
+      canvas.drawCircle(
+        Offset(x, y),
+        isToday ? 5 : 4,
+        Paint()..color = nodeColor,
+      );
+      if (isToday) {
+        canvas.drawCircle(
+          Offset(x, y),
+          7,
+          Paint()
+            ..color = todayColor
+            ..strokeWidth = 1.5
+            ..style = PaintingStyle.stroke,
+        );
+      }
+
+      // Count above the node, with a clear gap above the dot/ring.
+      _paintText(canvas, '${counts[i]}', countStyle, x, y - 10,
+          center: true, anchorBottom: true);
+
+      // Weekday letter at the bottom.
+      _paintText(
+        canvas,
+        dayLabels[i],
+        isToday ? todayLabelStyle : labelStyle,
+        x,
+        size.height - bottomReserve + 2,
+        center: true,
+      );
+    }
+  }
+
+  void _paintText(
+    Canvas canvas,
+    String text,
+    TextStyle style,
+    double centerX,
+    double y, {
+    bool center = false,
+    bool anchorBottom = false,
+  }) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    final dx = centerX - (center ? tp.width / 2 : 0);
+    final dy = anchorBottom ? y - tp.height : y;
+    tp.paint(canvas, Offset(dx, dy));
+  }
+
+  @override
+  bool shouldRepaint(_MissTrendPainter oldDelegate) =>
+      oldDelegate.counts != counts ||
+      oldDelegate.lineColor != lineColor ||
+      oldDelegate.todayColor != todayColor;
 }
 
 /// Quick "missed meal" dialog. Owns its own controller so it's disposed safely

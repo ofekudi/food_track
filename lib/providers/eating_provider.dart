@@ -129,6 +129,24 @@ class EatingProvider with ChangeNotifier {
     }).length;
   }
 
+  /// Miss counts for the last 7 days, oldest first. Index 6 is today,
+  /// index 0 is 6 days ago — ready to plot left-to-right as a trend.
+  List<int> get last7DaysMissCountsByDay {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final counts = List<int>.filled(7, 0);
+    for (final log in _allEatingLogs) {
+      if (!log.isMiss) continue;
+      final d =
+          DateTime(log.entryDate.year, log.entryDate.month, log.entryDate.day);
+      final diff = today.difference(d).inDays;
+      if (diff >= 0 && diff < 7) {
+        counts[6 - diff] += 1;
+      }
+    }
+    return counts;
+  }
+
   /// Consecutive recent days that qualify as "miss-free": at least 3 non-miss
   /// logs and zero misses. Today doesn't break the streak while it's still
   /// pending (no miss yet but fewer than 3 logs); a miss today ends it.

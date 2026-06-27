@@ -10,17 +10,26 @@ class SettingsProvider with ChangeNotifier {
   static const String _stopEatingTitleKey = 'stopEatingTitle';
   static const String _stopEatingEnabledKey = 'stopEatingEnabled';
 
+  // Key for the mindful pause (spinner) duration on the log CTA
+  static const String _pauseSecondsKey = 'mindfulPauseSeconds';
+
   // Default Title
   static const String defaultStopEatingTitle = "Late Snack Detected";
+
+  // Default mindful pause duration before the log CTA becomes tappable.
+  static const int defaultPauseSeconds = 5;
+  static const int maxPauseSeconds = 30;
 
   TimeOfDay? _kitchenClosedTime;
   String _stopEatingTitle = defaultStopEatingTitle;
   bool _stopEatingEnabled = false;
+  int _pauseSeconds = defaultPauseSeconds;
   Future<void>? _loadFuture;
 
   TimeOfDay? get kitchenClosedTime => _stopEatingEnabled ? _kitchenClosedTime : null;
   String get stopEatingTitle => _stopEatingTitle;
   bool get stopEatingEnabled => _stopEatingEnabled;
+  int get pauseSeconds => _pauseSeconds;
 
   // List of available titles - updated for mindful eating
   final List<String> availableStopEatingTitles = const [
@@ -62,6 +71,18 @@ class SettingsProvider with ChangeNotifier {
       await prefs.setString(_stopEatingTitleKey, _stopEatingTitle);
     }
 
+    // Load mindful pause duration, clamped to a sane range.
+    _pauseSeconds =
+        (prefs.getInt(_pauseSecondsKey) ?? defaultPauseSeconds).clamp(0, maxPauseSeconds);
+
+    notifyListeners();
+  }
+
+  Future<void> setPauseSeconds(int seconds) async {
+    final clamped = seconds.clamp(0, maxPauseSeconds);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_pauseSecondsKey, clamped);
+    _pauseSeconds = clamped;
     notifyListeners();
   }
 
