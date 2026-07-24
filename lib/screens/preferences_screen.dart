@@ -14,10 +14,36 @@ class PreferencesScreen extends StatelessWidget {
     final settings = context.read<SettingsProvider>();
     final result = await showDialog<int>(
       context: context,
-      builder: (_) => _PauseDurationDialog(initialSeconds: settings.pauseSeconds),
+      builder: (_) => _SliderPickerDialog(
+        title: AppStrings.pauseTimerDialogTitle,
+        initialValue: settings.pauseSeconds,
+        min: 0,
+        max: SettingsProvider.maxPauseSeconds,
+        valueLabel: (value) =>
+            value <= 0 ? AppStrings.off : '$value ${AppStrings.seconds}',
+        sliderLabel: _pauseLabel,
+      ),
     );
     if (result != null) {
       await settings.setPauseSeconds(result);
+    }
+  }
+
+  Future<void> _editRecordingsTarget(BuildContext context) async {
+    final settings = context.read<SettingsProvider>();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (_) => _SliderPickerDialog(
+        title: AppStrings.recordingsTargetDialogTitle,
+        initialValue: settings.recordingsTarget,
+        min: SettingsProvider.minRecordingsTarget,
+        max: SettingsProvider.maxRecordingsTarget,
+        valueLabel: (value) => '$value ${AppStrings.recordingsPerDayUnit}',
+        sliderLabel: (value) => '$value',
+      ),
+    );
+    if (result != null) {
+      await settings.setRecordingsTarget(result);
     }
   }
 
@@ -58,52 +84,83 @@ class PreferencesScreen extends StatelessWidget {
               onTap: () => _editPauseSeconds(context),
             ),
           ),
+          Consumer<SettingsProvider>(
+            builder: (context, settings, _) => ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text(AppStrings.dailyRecordingsTarget),
+              subtitle: const Text(AppStrings.dailyRecordingsTargetSubtitle),
+              trailing: Text(
+                '${settings.recordingsTarget}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              onTap: () => _editRecordingsTarget(context),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Lets the user pick the mindful pause duration (0–[maxPauseSeconds] seconds).
-class _PauseDurationDialog extends StatefulWidget {
-  final int initialSeconds;
+/// Lets the user pick a whole number in [min]–[max] with a slider.
+class _SliderPickerDialog extends StatefulWidget {
+  final String title;
+  final int initialValue;
+  final int min;
+  final int max;
 
-  const _PauseDurationDialog({required this.initialSeconds});
+  /// Big headline above the slider, e.g. "5 seconds".
+  final String Function(int value) valueLabel;
+
+  /// Compact bubble label on the slider thumb, e.g. "5s".
+  final String Function(int value) sliderLabel;
+
+  const _SliderPickerDialog({
+    required this.title,
+    required this.initialValue,
+    required this.min,
+    required this.max,
+    required this.valueLabel,
+    required this.sliderLabel,
+  });
 
   @override
-  State<_PauseDurationDialog> createState() => _PauseDurationDialogState();
+  State<_SliderPickerDialog> createState() => _SliderPickerDialogState();
 }
 
-class _PauseDurationDialogState extends State<_PauseDurationDialog> {
-  late int _seconds;
+class _SliderPickerDialogState extends State<_SliderPickerDialog> {
+  late int _value;
 
   @override
   void initState() {
     super.initState();
-    _seconds = widget.initialSeconds;
+    _value = widget.initialValue;
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text(AppStrings.pauseTimerDialogTitle),
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            _seconds <= 0 ? AppStrings.off : '$_seconds ${AppStrings.seconds}',
+            widget.valueLabel(_value),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
                 ),
           ),
           Slider(
-            value: _seconds.toDouble(),
-            min: 0,
-            max: SettingsProvider.maxPauseSeconds.toDouble(),
-            divisions: SettingsProvider.maxPauseSeconds,
-            label: _seconds <= 0 ? AppStrings.off : '${_seconds}s',
-            onChanged: (value) => setState(() => _seconds = value.round()),
+            value: _value.toDouble(),
+            min: widget.min.toDouble(),
+            max: widget.max.toDouble(),
+            divisions: widget.max - widget.min,
+            label: widget.sliderLabel(_value),
+            onChanged: (value) => setState(() => _value = value.round()),
           ),
         ],
       ),
@@ -113,7 +170,7 @@ class _PauseDurationDialogState extends State<_PauseDurationDialog> {
           child: const Text(AppStrings.cancel),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(_seconds),
+          onPressed: () => Navigator.of(context).pop(_value),
           child: const Text(AppStrings.save),
         ),
       ],

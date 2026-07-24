@@ -7,13 +7,12 @@ class EatingProvider with ChangeNotifier {
   List<EatingLog> _eatingLogs = [];
   DateTime _selectedDate = DateTime.now();
 
-  // All entries for analytics
+  // Every entry, for the 7-day trend and the streak/target counters
   List<EatingLog> _allEatingLogs = [];
   bool _hasLoadedAllLogs = false;
 
   List<EatingLog> get eatingLogs => _eatingLogs;
   DateTime get selectedDate => _selectedDate;
-  List<EatingLog> get allEatingLogs => _allEatingLogs;
 
   Future<void> loadEatingLogs() async {
     final logsData = await _dbHelper.getEatingLogsForDate(_selectedDate);
@@ -92,28 +91,6 @@ class EatingProvider with ChangeNotifier {
     await loadEatingLogs();
   }
 
-  /// Get today's logs count
-  int get todayLogCount => _eatingLogs.length;
-
-  /// Get the reason distribution for current day
-  Map<EatingReason, int> get todayReasonDistribution {
-    Map<EatingReason, int> distribution = {};
-    for (var reason in EatingReason.values) {
-      distribution[reason] = 0;
-    }
-    for (var log in _eatingLogs) {
-      distribution[log.reason] = (distribution[log.reason] ?? 0) + 1;
-    }
-    return distribution;
-  }
-
-  /// Get average hunger level for current day
-  double get todayAverageHunger {
-    if (_eatingLogs.isEmpty) return 0;
-    final total = _eatingLogs.fold<int>(0, (sum, log) => sum + log.hungerLevel);
-    return total / _eatingLogs.length;
-  }
-
   String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
   /// Count of "miss" entries in the last 7 days (today + previous 6).
@@ -129,14 +106,15 @@ class EatingProvider with ChangeNotifier {
     }).length;
   }
 
-  /// Miss counts for the last 7 days, oldest first. Index 6 is today,
-  /// index 0 is 6 days ago — ready to plot left-to-right as a trend.
-  List<int> get last7DaysMissCountsByDay {
+  /// Per-day counts of the entries matching [include] over the last 7 days,
+  /// oldest first. Index 6 is today, index 0 is 6 days ago — ready to plot
+  /// left-to-right as a trend.
+  List<int> _last7DaysCountsByDay(bool Function(EatingLog) include) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final counts = List<int>.filled(7, 0);
     for (final log in _allEatingLogs) {
-      if (!log.isMiss) continue;
+      if (!include(log)) continue;
       final d =
           DateTime(log.entryDate.year, log.entryDate.month, log.entryDate.day);
       final diff = today.difference(d).inDays;
@@ -145,6 +123,57 @@ class EatingProvider with ChangeNotifier {
       }
     }
     return counts;
+  }
+
+  /// Miss counts for the last 7 days, oldest first.
+  List<int> get last7DaysMissCountsByDay =>
+      _last7DaysCountsByDay((log) => log.isMiss);
+
+  /// Recording counts for the last 7 days, oldest first. Misses count too —
+  /// they're still an eating occasion, just logged after the fact — but drinks
+  /// don't.
+  List<int> get last7DaysRecordingCountsByDay =>
+      _last7DaysCountsByDay((log) => log.countsTowardTarget);
+
+  /// What today has spent of the daily budget: misses included, drinks not.
+  /// Unlike [todayLogCount] this always means *today*, never the date the user
+  /// is browsing.
+  int get todayRecordingCount {
+    final now = DateTime.now();
+    final key = _dayKey(DateTime(now.year, now.month, now.day));
+    return _allEatingLogs
+        .where((log) => log.countsTowardTarget && _dayKey(log.entryDate) == key)
+        .length;
+  }
+
+  /// Consecutive recent days that stayed on target: at least one recording and
+  /// no more than [target]. Today doesn't break the streak while it's still
+  /// pending (nothing logged yet, or still within target); going over ends it.
+  int daysOnTargetStreak(int target) {
+    final Map<String, int> countByDay = {};
+    for (final log in _allEatingLogs) {
+      if (!log.countsTowardTarget) continue;
+      final key = _dayKey(log.entryDate);
+      countByDay[key] = (countByDay[key] ?? 0) + 1;
+    }
+
+    final now = DateTime.now();
+    var day = DateTime(now.year, now.month, now.day);
+    int streak = 0;
+    bool isToday = true;
+    while (true) {
+      final count = countByDay[_dayKey(day)] ?? 0;
+      if (count > 0 && count <= target) {
+        streak++;
+      } else if (isToday && count <= target) {
+        // Today is still pending — nothing logged yet, but nothing over either.
+      } else {
+        break;
+      }
+      day = day.subtract(const Duration(days: 1));
+      isToday = false;
+    }
+    return streak;
   }
 
   /// Consecutive recent days that qualify as "miss-free": at least 3 non-miss

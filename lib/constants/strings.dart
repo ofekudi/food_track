@@ -5,7 +5,6 @@ class AppStrings {
   static const appName = 'Mindful Eating';
 
   // Order priming ("log before you eat")
-  static const orderTagline = 'Log → Eat'; // home AppBar subtitle
   static const stepLog = 'Log';
   static const stepBreathe = 'Breathe';
   static const stepEat = 'Eat';
@@ -23,6 +22,7 @@ class AppStrings {
   static const reasonCraving = 'Craving';
   static const reasonSocial = 'Social';
   static const reasonHabit = 'Habit';
+  static const reasonDrink = 'Drinks'; // doesn't count toward the daily target
   static const backToHunger = 'Back to hunger';
 
   // Description
@@ -58,30 +58,37 @@ class AppStrings {
   static const missDialogHint = 'What did you eat?';
   static const loggedAsMiss = 'Logged as a miss';
   static const cancel = 'Cancel';
-  static const last7DaysMisses = '7-Day Misses';
-  static const missFreeStreak = 'Miss-Free Streak';
-  static const last7DaysTrend = 'Misses per day';
+  // Recordings-per-day trend + its target
+  static const recordingsTrendTitle = 'Recordings';
+  static const onTargetStreakSuffix = 'd on target'; // e.g. "5d on target"
+  static const legendOnTarget = 'on target';
+  static const legendOverTarget = 'over';
+  static const legendMissed = 'missed';
+
+  /// "2 misses in 7d" — the week's miss total in the chart footer.
+  static String missesInWeek(int count) => '$count misses in 7d';
+
+  /// The today line above the chart, e.g. "2 of 3 today · 1 left".
+  static String todayProgress(int count, int target) => '$count of $target today';
+  static String recordingsLeft(int left) => '$left left';
+  static String recordingsOver(int over) => '$over over';
+  static const recordingsOnTarget = 'right on target';
+
+  // Over-target intervention (shown before the add flow when today is full)
+  static const overTargetTitle = 'Already at your target';
+  static String overTargetBody(int count, int target) =>
+      'You have logged $count today and your target is $target. '
+      'Are you truly hungry, or is this something else?';
+  static const recordingsTargetLabel = 'target'; // e.g. "target 3"
+  static const dailyRecordingsTarget = 'Daily recordings target';
+  static const dailyRecordingsTargetSubtitle = 'Meals you aim to log each day';
+  static const recordingsTargetDialogTitle = 'Recordings per day';
+  static const recordingsPerDayUnit = 'per day';
 
   // Kitchen closed
   static const kitchenClosedQuestion = 'Are you hungry or just looking for a snack?';
   static const tryTheseInstead = 'Try These Instead';
   static const gotIt = 'Got It';
-
-  // Analytics
-  static const weeklyInsights = 'Insights';
-  static const noDataTitle = 'No data for this period';
-  static const noDataSubtitle = 'Start logging your meals to see insights';
-  static const totalEntries = 'Total Entries';
-  static const avgHunger = 'Avg Hunger';
-  static const lateNight = 'Late Night';
-  static const whyYouEat = 'Why You Eat';
-  static const hungerPatterns = 'Hunger Patterns';
-  static const whenYouEat = 'When You Eat';
-  static const eatingTimes = 'Eating times';
-  static const hungerLevels = 'Hunger levels';
-  static const byDayOfWeek = 'By day of week:';
-  static const lowHungerWarning = '% of eating happened at low hunger (1-2)';
-  static const ateWhenNotHungry = 'You ate when not hungry %d times this week';
 
   // Entry actions
   static const edit = 'Edit';
@@ -109,14 +116,6 @@ class AppStrings {
   static const notSet = 'Not set';
   static const kitchenClosedDescription =
       'When enabled, a gentle reminder will appear if you open the app after the set time, asking if you\'re truly hungry or just snacking out of habit.';
-
-  // Time ranges
-  static const last7Days = 'Last 7 days';
-  static const last14Days = 'Last 14 days';
-  static const last30Days = 'Last 30 days';
-
-  // Days of week
-  static const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   // Mindfulness timer
   static const mindfulnessPausing = 'Taking a moment to pause...';

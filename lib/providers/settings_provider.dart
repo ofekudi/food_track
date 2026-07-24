@@ -13,6 +13,9 @@ class SettingsProvider with ChangeNotifier {
   // Key for the mindful pause (spinner) duration on the log CTA
   static const String _pauseSecondsKey = 'mindfulPauseSeconds';
 
+  // Key for the daily recordings target shown on the home trend chart
+  static const String _recordingsTargetKey = 'dailyRecordingsTarget';
+
   // Default Title
   static const String defaultStopEatingTitle = "Late Snack Detected";
 
@@ -20,16 +23,23 @@ class SettingsProvider with ChangeNotifier {
   static const int defaultPauseSeconds = 5;
   static const int maxPauseSeconds = 30;
 
+  // Default number of eating recordings to aim for each day.
+  static const int defaultRecordingsTarget = 3;
+  static const int minRecordingsTarget = 1;
+  static const int maxRecordingsTarget = 10;
+
   TimeOfDay? _kitchenClosedTime;
   String _stopEatingTitle = defaultStopEatingTitle;
   bool _stopEatingEnabled = false;
   int _pauseSeconds = defaultPauseSeconds;
+  int _recordingsTarget = defaultRecordingsTarget;
   Future<void>? _loadFuture;
 
   TimeOfDay? get kitchenClosedTime => _stopEatingEnabled ? _kitchenClosedTime : null;
   String get stopEatingTitle => _stopEatingTitle;
   bool get stopEatingEnabled => _stopEatingEnabled;
   int get pauseSeconds => _pauseSeconds;
+  int get recordingsTarget => _recordingsTarget;
 
   // List of available titles - updated for mindful eating
   final List<String> availableStopEatingTitles = const [
@@ -75,6 +85,18 @@ class SettingsProvider with ChangeNotifier {
     _pauseSeconds =
         (prefs.getInt(_pauseSecondsKey) ?? defaultPauseSeconds).clamp(0, maxPauseSeconds);
 
+    // Load the daily recordings target, clamped to a sane range.
+    _recordingsTarget = (prefs.getInt(_recordingsTargetKey) ?? defaultRecordingsTarget)
+        .clamp(minRecordingsTarget, maxRecordingsTarget);
+
+    notifyListeners();
+  }
+
+  Future<void> setRecordingsTarget(int target) async {
+    final clamped = target.clamp(minRecordingsTarget, maxRecordingsTarget);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_recordingsTargetKey, clamped);
+    _recordingsTarget = clamped;
     notifyListeners();
   }
 

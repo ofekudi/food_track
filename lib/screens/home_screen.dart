@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -8,9 +6,9 @@ import '../providers/settings_provider.dart';
 import '../models/eating_log.dart';
 import '../constants/strings.dart';
 import '../widgets/hunger_indicator.dart';
+import '../widgets/recordings_chart.dart';
 import '../widgets/reason_chip.dart';
 import 'add_entry_screen.dart';
-import 'meal_analytics_screen.dart';
 import 'preferences_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -48,7 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
     await settingsProvider.ensureLoaded();
     if (!mounted) return;
 
-    final selectedDate = context.read<EatingProvider>().selectedDate;
+    final eatingProvider = context.read<EatingProvider>();
+    final selectedDate = eatingProvider.selectedDate;
+
+    // Only intervene on today — back-filling an older day shouldn't be nagged.
+    final target = settingsProvider.recordingsTarget;
+    final todayCount = eatingProvider.todayRecordingCount;
+    if (_isToday(selectedDate) && todayCount >= target) {
+      _showOverTargetDialog(todayCount, target);
+      return;
+    }
 
     if (_shouldShowKitchenClosedReminder()) {
       _showKitchenClosedDialog(settingsProvider.stopEatingTitle);
@@ -59,6 +66,28 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddEntryScreen(targetDate: selectedDate),
+      ),
+    );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  /// Opens the add flow for the day being browsed, optionally with the reason
+  /// already picked from an intervention dialog.
+  void _openAddEntry({EatingReason? preselectedReason}) {
+    final selectedDate = context.read<EatingProvider>().selectedDate;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEntryScreen(
+          targetDate: selectedDate,
+          preselectedReason: preselectedReason,
+        ),
       ),
     );
   }
@@ -78,76 +107,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showKitchenClosedDialog(String title) {
+    _showInterventionDialog(
+      icon: Icons.bedtime_outlined,
+      title: title,
+      body: AppStrings.kitchenClosedQuestion,
+    );
+  }
+
+  /// Shown when today has already hit the recordings target — the yell lands
+  /// here, before the add flow, rather than in a chart you have to interpret.
+  void _showOverTargetDialog(int count, int target) {
+    _showInterventionDialog(
+      icon: Icons.flag_outlined,
+      title: AppStrings.overTargetTitle,
+      body: AppStrings.overTargetBody(count, target),
+    );
+  }
+
+  /// Pre-log check-in: a reason shortcut for every reason (each continues into
+  /// the add flow with it preselected) plus a plain dismiss.
+  void _showInterventionDialog({
+    required IconData icon,
+    required String title,
+    required String body,
+  }) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           icon: Icon(
-            Icons.bedtime_outlined,
+            icon,
             color: Theme.of(dialogContext).colorScheme.primary,
             size: 40,
           ),
-          title: Text(title),
-          content: const Text(
-            AppStrings.kitchenClosedQuestion,
-            textAlign: TextAlign.center,
-          ),
+          title: Text(title, textAlign: TextAlign.center),
+          content: Text(body, textAlign: TextAlign.center),
           actionsAlignment: MainAxisAlignment.center,
           actions: <Widget>[
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
                   children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        final selectedDate = context.read<EatingProvider>().selectedDate;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEntryScreen(
-                              targetDate: selectedDate,
-                              preselectedReason: EatingReason.hungry,
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Text(AppStrings.reasonHungry),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        final selectedDate = context.read<EatingProvider>().selectedDate;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEntryScreen(
-                              targetDate: selectedDate,
-                              preselectedReason: EatingReason.bored,
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Text(AppStrings.reasonBored),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        final selectedDate = context.read<EatingProvider>().selectedDate;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEntryScreen(
-                              targetDate: selectedDate,
-                              preselectedReason: EatingReason.habit,
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Text(AppStrings.reasonHabit),
-                    ),
+                    for (final reason in EatingReason.values)
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _openAddEntry(preselectedReason: reason);
+                        },
+                        child: Text(reason.displayName),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -291,16 +302,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text(AppStrings.appName),
         actions: [
           IconButton(
-            icon: const Icon(Icons.insights),
-            tooltip: AppStrings.weeklyInsights,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MealAnalyticsScreen()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: AppStrings.preferences,
             onPressed: () {
@@ -322,8 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return Column(
             children: [
-              _buildOrderBanner(context),
-              _buildMissStats(context, eatingProvider),
+              _buildTrends(context, eatingProvider),
               // Date navigation
               Padding(
                 padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
@@ -420,75 +420,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Full-width banner under the app bar priming the "Log → Eat" order.
-  Widget _buildOrderBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      color: theme.colorScheme.primaryContainer,
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.restaurant_menu,
-            size: 20,
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            AppStrings.orderTagline,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Two engagement stat boxes plus a 7-day miss trend at the top of the page.
-  Widget _buildMissStats(BuildContext context, EatingProvider provider) {
+  /// The single 7-day card at the top of the page: recordings per day stacked
+  /// into logged vs. missed, against the daily target.
+  Widget _buildTrends(BuildContext context, EatingProvider provider) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatBox(
-                  context,
-                  value: '${provider.last7DaysMissCount}',
-                  label: AppStrings.last7DaysMisses,
-                  icon: Icons.error_outline,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatBox(
-                  context,
-                  value: '${provider.daysWithoutMissStreak}',
-                  label: AppStrings.missFreeStreak,
-                  icon: Icons.local_fire_department,
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildMissTrend(context, provider.last7DaysMissCountsByDay),
-        ],
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, _) =>
+            _buildRecordingsCard(context, provider, settings.recordingsTarget),
       ),
     );
   }
 
-  /// Compact line chart of misses per day over the last 7 days (oldest → today)
-  /// with the per-day nodes linked, so the trend across good and bad days
-  /// reads at a glance.
-  Widget _buildMissTrend(BuildContext context, List<int> counts) {
+  Widget _buildRecordingsCard(
+    BuildContext context,
+    EatingProvider provider,
+    int target,
+  ) {
     final theme = Theme.of(context);
+    final totals = provider.last7DaysRecordingCountsByDay;
+    final todayCount = totals.isEmpty ? 0 : totals.last;
+    final streak = provider.daysOnTargetStreak(target);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -499,54 +452,168 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            AppStrings.last7DaysTrend,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _trendHeaderLabel(context, AppStrings.recordingsTrendTitle),
+              _trendHeaderSeparator(context),
+              _trendHeaderLabel(
+                context,
+                '${AppStrings.recordingsTargetLabel} $target',
+                icon: Icons.flag_outlined,
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _MissTrendChart(counts: counts),
+          const SizedBox(height: 4),
+          _buildTodayLine(context, todayCount, target),
+          const SizedBox(height: 8),
+          RecordingsChart(
+            totals: totals,
+            misses: provider.last7DaysMissCountsByDay,
+            target: target,
+            countColor: (count) => _recordingsTierColor(count, target),
+            withinTargetColor: Colors.green,
+            overTargetColor: Colors.amber.shade700,
+            missColor: Colors.red,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _trendHeaderLabel(
+                context,
+                '$streak${AppStrings.onTargetStreakSuffix}',
+                icon: Icons.local_fire_department,
+                color: streak > 0 ? Colors.green : null,
+              ),
+              _trendHeaderSeparator(context),
+              _trendHeaderLabel(
+                context,
+                AppStrings.missesInWeek(provider.last7DaysMissCount),
+                icon: Icons.error_outline,
+                color: provider.last7DaysMissCount > 0 ? Colors.red : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _buildLegend(context),
         ],
       ),
     );
   }
 
-  Widget _buildStatBox(
-    BuildContext context, {
-    required String value,
-    required String label,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+  /// The one line that answers "should I be eating right now?" — today's count
+  /// against the target, plus how much room is left.
+  Widget _buildTodayLine(BuildContext context, int count, int target) {
+    final theme = Theme.of(context);
+    final over = count - target;
+    final color = _recordingsTierColor(count, target);
+    final String suffix;
+    if (over > 0) {
+      suffix = AppStrings.recordingsOver(over);
+    } else if (over == 0) {
+      suffix = AppStrings.recordingsOnTarget;
+    } else {
+      suffix = AppStrings.recordingsLeft(-over);
+    }
+
+    return Wrap(
+      spacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          AppStrings.todayProgress(count, target),
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: color,
+            fontWeight: FontWeight.bold,
           ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
-      ),
+        ),
+        _trendHeaderSeparator(context),
+        Text(
+          suffix,
+          style: theme.textTheme.bodyMedium?.copyWith(color: color),
+        ),
+      ],
     );
   }
+
+  /// Key for what each block's color means, since "red = a miss" isn't a
+  /// convention anyone can guess.
+  Widget _buildLegend(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    Widget entry(Color color, String label) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(label, style: style),
+          ],
+        );
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 2,
+      children: [
+        entry(Colors.green, AppStrings.legendOnTarget),
+        entry(Colors.amber.shade700, AppStrings.legendOverTarget),
+        entry(Colors.red, AppStrings.legendMissed),
+      ],
+    );
+  }
+
+  /// Green at or under the daily target, yellow for one or two over, red
+  /// beyond that. With the default target of 3 that reads: 0-3 green, 4-5
+  /// yellow, 6+ red.
+  Color _recordingsTierColor(int count, int target) {
+    if (count <= target) return Colors.green;
+    if (count <= target + 2) return Colors.amber.shade700;
+    return Colors.red;
+  }
+
+  /// One piece of a trend card's title, optionally prefixed with a small icon.
+  Widget _trendHeaderLabel(
+    BuildContext context,
+    String text, {
+    IconData? icon,
+    Color? color,
+  }) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.labelMedium?.copyWith(
+      color: color ?? theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    final label = Text(text, style: style);
+    if (icon == null) return label;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color ?? theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 3),
+        label,
+      ],
+    );
+  }
+
+  Widget _trendHeaderSeparator(BuildContext context) => Text(
+        '·',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+      );
 
   Widget _buildEatingLogsList(List<EatingLog> logs) {
     if (logs.isEmpty) {
@@ -618,184 +685,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-}
-
-/// Small connected line chart of misses per day (oldest → today). Nodes are
-/// linked by a line so the up/down trend is visible without any tooltip.
-class _MissTrendChart extends StatelessWidget {
-  final List<int> counts;
-
-  const _MissTrendChart({required this.counts});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dayLabels = List.generate(counts.length, (i) {
-      final day = today.subtract(Duration(days: counts.length - 1 - i));
-      return DateFormat('EEE').format(day)[0];
-    });
-
-    return SizedBox(
-      height: 84,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _MissTrendPainter(
-          counts: counts,
-          dayLabels: dayLabels,
-          lineColor: Colors.orange,
-          mutedColor: theme.colorScheme.outlineVariant,
-          todayColor: theme.colorScheme.primary,
-          countStyle: theme.textTheme.labelMedium?.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ) ??
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          labelStyle: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ) ??
-              const TextStyle(fontSize: 11),
-          todayLabelStyle: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ) ??
-              TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary),
-        ),
-      ),
-    );
-  }
-}
-
-class _MissTrendPainter extends CustomPainter {
-  final List<int> counts;
-  final List<String> dayLabels;
-  final Color lineColor;
-  final Color mutedColor;
-  final Color todayColor;
-  final TextStyle countStyle;
-  final TextStyle labelStyle;
-  final TextStyle todayLabelStyle;
-
-  _MissTrendPainter({
-    required this.counts,
-    required this.dayLabels,
-    required this.lineColor,
-    required this.mutedColor,
-    required this.todayColor,
-    required this.countStyle,
-    required this.labelStyle,
-    required this.todayLabelStyle,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (counts.isEmpty) return;
-
-    const double topReserve = 26; // room for the count above each node
-    const double bottomReserve = 18; // room for the weekday label
-    const double sideInset = 12; // keep edge nodes off the border
-    final double plotTop = topReserve;
-    final double plotBottom = size.height - bottomReserve;
-    final double plotWidth = size.width - 2 * sideInset;
-    final int n = counts.length;
-    final int maxCount = counts.fold<int>(0, (m, v) => v > m ? v : m);
-    final int todayIndex = n - 1;
-
-    double xFor(int i) =>
-        n == 1 ? size.width / 2 : sideInset + plotWidth * i / (n - 1);
-    double yFor(int i) {
-      final pct = maxCount > 0 ? counts[i] / maxCount : 0.0;
-      return plotBottom - pct * (plotBottom - plotTop);
-    }
-
-    // Connecting line through all nodes.
-    final linePaint = Paint()
-      ..color = lineColor.withValues(alpha: 0.7)
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    final path = Path();
-    for (int i = 0; i < n; i++) {
-      final x = xFor(i);
-      final y = yFor(i);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(path, linePaint);
-
-    // Nodes + count labels + day labels.
-    for (int i = 0; i < n; i++) {
-      final x = xFor(i);
-      final y = yFor(i);
-      final isToday = i == todayIndex;
-      final hasMiss = counts[i] > 0;
-      final nodeColor = hasMiss ? lineColor : mutedColor;
-
-      // Node: filled dot, with a ring for today.
-      canvas.drawCircle(
-        Offset(x, y),
-        isToday ? 5 : 4,
-        Paint()..color = nodeColor,
-      );
-      if (isToday) {
-        canvas.drawCircle(
-          Offset(x, y),
-          7,
-          Paint()
-            ..color = todayColor
-            ..strokeWidth = 1.5
-            ..style = PaintingStyle.stroke,
-        );
-      }
-
-      // Count above the node, with a clear gap above the dot/ring.
-      _paintText(canvas, '${counts[i]}', countStyle, x, y - 10,
-          center: true, anchorBottom: true);
-
-      // Weekday letter at the bottom.
-      _paintText(
-        canvas,
-        dayLabels[i],
-        isToday ? todayLabelStyle : labelStyle,
-        x,
-        size.height - bottomReserve + 2,
-        center: true,
-      );
-    }
-  }
-
-  void _paintText(
-    Canvas canvas,
-    String text,
-    TextStyle style,
-    double centerX,
-    double y, {
-    bool center = false,
-    bool anchorBottom = false,
-  }) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
-    final dx = centerX - (center ? tp.width / 2 : 0);
-    final dy = anchorBottom ? y - tp.height : y;
-    tp.paint(canvas, Offset(dx, dy));
-  }
-
-  @override
-  bool shouldRepaint(_MissTrendPainter oldDelegate) =>
-      oldDelegate.counts != counts ||
-      oldDelegate.lineColor != lineColor ||
-      oldDelegate.todayColor != todayColor;
 }
 
 /// Quick "missed meal" dialog. Owns its own controller so it's disposed safely

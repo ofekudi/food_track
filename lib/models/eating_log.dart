@@ -7,7 +7,11 @@ enum EatingReason {
   bored,
   craving,
   social,
-  habit;
+  habit,
+
+  /// Coffee, tea, a glass of something — recorded so it's on the list, but it
+  /// doesn't spend the day's recordings budget. See [EatingLog.countsTowardTarget].
+  drink;
 
   String get displayName {
     switch (this) {
@@ -21,6 +25,8 @@ enum EatingReason {
         return AppStrings.reasonSocial;
       case EatingReason.habit:
         return AppStrings.reasonHabit;
+      case EatingReason.drink:
+        return AppStrings.reasonDrink;
     }
   }
 
@@ -89,6 +95,13 @@ class EatingLog {
       'is_miss': isMiss ? 1 : 0,
     };
   }
+
+  /// Drinks are logged for the record but don't spend the daily budget.
+  bool get isDrink => reason == EatingReason.drink;
+
+  /// Whether this entry counts against the daily recordings target. Misses do
+  /// (you still ate); drinks don't.
+  bool get countsTowardTarget => !isDrink;
 
   /// Returns true if this log suggests non-mindful eating (low hunger + bored)
   bool get suggestsIntervention => hungerLevel <= 2 && reason == EatingReason.bored;
