@@ -473,9 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
             totals: totals,
             misses: provider.last7DaysMissCountsByDay,
             target: target,
-            countColor: (count) => _recordingsTierColor(count, target),
-            withinTargetColor: Colors.green,
-            overTargetColor: Colors.amber.shade700,
+            loggedColor: Colors.green,
             missColor: Colors.red,
           ),
           const SizedBox(height: 8),
@@ -511,7 +509,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTodayLine(BuildContext context, int count, int target) {
     final theme = Theme.of(context);
     final over = count - target;
-    final color = _recordingsTierColor(count, target);
     final String suffix;
     if (over > 0) {
       suffix = AppStrings.recordingsOver(over);
@@ -528,21 +525,24 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           AppStrings.todayProgress(count, target),
           style: theme.textTheme.titleMedium?.copyWith(
-            color: color,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
         _trendHeaderSeparator(context),
         Text(
           suffix,
-          style: theme.textTheme.bodyMedium?.copyWith(color: color),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
   }
 
   /// Key for what each block's color means, since "red = a miss" isn't a
-  /// convention anyone can guess.
+  /// convention anyone can guess. Going over the target isn't a color — the
+  /// dashed line in the chart carries that.
   Widget _buildLegend(BuildContext context) {
     final theme = Theme.of(context);
     final style = theme.textTheme.labelSmall?.copyWith(
@@ -568,20 +568,10 @@ class _HomeScreenState extends State<HomeScreen> {
       spacing: 10,
       runSpacing: 2,
       children: [
-        entry(Colors.green, AppStrings.legendOnTarget),
-        entry(Colors.amber.shade700, AppStrings.legendOverTarget),
+        entry(Colors.green, AppStrings.legendLogged),
         entry(Colors.red, AppStrings.legendMissed),
       ],
     );
-  }
-
-  /// Green at or under the daily target, yellow for one or two over, red
-  /// beyond that. With the default target of 3 that reads: 0-3 green, 4-5
-  /// yellow, 6+ red.
-  Color _recordingsTierColor(int count, int target) {
-    if (count <= target) return Colors.green;
-    if (count <= target + 2) return Colors.amber.shade700;
-    return Colors.red;
   }
 
   /// One piece of a trend card's title, optionally prefixed with a small icon.

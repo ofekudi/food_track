@@ -7,14 +7,13 @@ import 'package:intl/intl.dart';
 /// Stacked bar chart of recordings per day (oldest → today) against a daily
 /// target.
 ///
-/// Every recording is one block, stacked bottom-up, and each block is colored
-/// by what's wrong with it — worst first:
-/// * **[missColor]** — it was a miss (eaten first, logged after).
-/// * **[overTargetColor]** — it sits above the [target] line.
-/// * **[withinTargetColor]** — a clean, planned recording.
+/// Every recording is one block, stacked bottom-up, in one of two colors:
+/// * **[loggedColor]** — food you recorded, at the bottom.
+/// * **[missColor]** — a miss (eaten first, logged after), on top.
 ///
-/// Misses stack at the bottom, so a day of 4 with 3 misses reads as three red
-/// blocks with a single over-target block on top.
+/// Going over the [target] is not a color: the dashed target line is what says
+/// a day ran long, so a block above it stays [loggedColor]. A day of 4 with 1
+/// miss therefore reads as three logged blocks with a single red one on top.
 class RecordingsChart extends StatelessWidget {
   /// Total recordings per day, oldest → today. The last entry is today.
   final List<int> totals;
@@ -25,11 +24,7 @@ class RecordingsChart extends StatelessWidget {
   /// The daily target the dashed line sits at.
   final int target;
 
-  /// Color of the count printed above each bar, resolved from that day's total.
-  final Color Function(int total) countColor;
-
-  final Color withinTargetColor;
-  final Color overTargetColor;
+  final Color loggedColor;
   final Color missColor;
 
   final double height;
@@ -39,9 +34,7 @@ class RecordingsChart extends StatelessWidget {
     required this.totals,
     required this.misses,
     required this.target,
-    required this.countColor,
-    required this.withinTargetColor,
-    required this.overTargetColor,
+    required this.loggedColor,
     required this.missColor,
     this.height = 110,
   });
@@ -65,9 +58,7 @@ class RecordingsChart extends StatelessWidget {
           misses: misses,
           target: target,
           dayLabels: dayLabels,
-          countColor: countColor,
-          withinTargetColor: withinTargetColor,
-          overTargetColor: overTargetColor,
+          loggedColor: loggedColor,
           missColor: missColor,
           targetLineColor: theme.colorScheme.onSurfaceVariant,
           mutedColor: theme.colorScheme.outlineVariant,
@@ -101,9 +92,7 @@ class _RecordingsPainter extends CustomPainter {
   final List<int> misses;
   final int target;
   final List<String> dayLabels;
-  final Color Function(int total) countColor;
-  final Color withinTargetColor;
-  final Color overTargetColor;
+  final Color loggedColor;
   final Color missColor;
   final Color targetLineColor;
   final Color mutedColor;
@@ -117,9 +106,7 @@ class _RecordingsPainter extends CustomPainter {
     required this.misses,
     required this.target,
     required this.dayLabels,
-    required this.countColor,
-    required this.withinTargetColor,
-    required this.overTargetColor,
+    required this.loggedColor,
     required this.missColor,
     required this.targetLineColor,
     required this.mutedColor,
@@ -177,13 +164,13 @@ class _RecordingsPainter extends CustomPainter {
         );
       }
 
-      // One block per recording, stacked bottom-up. Misses sit at the bottom
-      // so the blocks that break the target line are the surplus ones.
+      // One block per recording, stacked bottom-up: the food you logged first,
+      // then the misses on top. The dashed target line — not the color — is
+      // what says a day went over.
+      final int logged = total - missed;
       for (int unit = 0; unit < total; unit++) {
-        final Color color = unit < missed
-            ? missColor
-            : (unit >= target ? overTargetColor : withinTargetColor);
-        _paintBlock(canvas, left, barWidth, unit, yForValue, color);
+        _paintBlock(canvas, left, barWidth, unit, yForValue,
+            unit < logged ? loggedColor : missColor);
       }
 
       // Count above the bar (or above the baseline on an empty day).
@@ -192,7 +179,7 @@ class _RecordingsPainter extends CustomPainter {
       _paintText(
         canvas,
         '$total',
-        countStyle.copyWith(color: countColor(total)),
+        countStyle,
         centerX(i),
         labelY,
         center: true,
@@ -287,9 +274,7 @@ class _RecordingsPainter extends CustomPainter {
       oldDelegate.totals != totals ||
       oldDelegate.misses != misses ||
       oldDelegate.target != target ||
-      oldDelegate.countColor != countColor ||
-      oldDelegate.withinTargetColor != withinTargetColor ||
-      oldDelegate.overTargetColor != overTargetColor ||
+      oldDelegate.loggedColor != loggedColor ||
       oldDelegate.missColor != missColor ||
       oldDelegate.todayColor != todayColor;
 }

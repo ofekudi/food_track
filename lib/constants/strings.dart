@@ -61,8 +61,7 @@ class AppStrings {
   // Recordings-per-day trend + its target
   static const recordingsTrendTitle = 'Recordings';
   static const onTargetStreakSuffix = 'd on target'; // e.g. "5d on target"
-  static const legendOnTarget = 'on target';
-  static const legendOverTarget = 'over';
+  static const legendLogged = 'logged';
   static const legendMissed = 'missed';
 
   /// "2 misses in 7d" — the week's miss total in the chart footer.
