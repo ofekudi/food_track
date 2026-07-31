@@ -60,7 +60,11 @@ class RecordingsChart extends StatelessWidget {
           dayLabels: dayLabels,
           loggedColor: loggedColor,
           missColor: missColor,
-          targetLineColor: theme.colorScheme.onSurfaceVariant,
+          // Now that no copy above the chart repeats the target, the dashed
+          // line and the value on it are the only place it appears — so it
+          // gets a full-strength neutral rather than a muted one. No new hue,
+          // so it doesn't compete with the green and red blocks.
+          targetLineColor: theme.colorScheme.onSurface,
           mutedColor: theme.colorScheme.outlineVariant,
           todayColor: theme.colorScheme.primary,
           countStyle: theme.textTheme.labelMedium?.copyWith(

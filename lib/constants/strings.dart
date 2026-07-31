@@ -58,27 +58,18 @@ class AppStrings {
   static const missDialogHint = 'What did you eat?';
   static const loggedAsMiss = 'Logged as a miss';
   static const cancel = 'Cancel';
-  // Recordings-per-day trend + its target
-  static const recordingsTrendTitle = 'Recordings';
+  // Recordings-per-day trend. The chart carries its own labels, so these two
+  // lines are the only copy on the card.
   static const onTargetStreakSuffix = 'd on target'; // e.g. "5d on target"
-  static const legendLogged = 'logged';
-  static const legendMissed = 'missed';
 
-  /// "2 misses in 7d" — the week's miss total in the chart footer.
+  /// "2 misses in 7d" — the week's miss total above the chart.
   static String missesInWeek(int count) => '$count misses in 7d';
-
-  /// The today line above the chart, e.g. "2 of 3 today · 1 left".
-  static String todayProgress(int count, int target) => '$count of $target today';
-  static String recordingsLeft(int left) => '$left left';
-  static String recordingsOver(int over) => '$over over';
-  static const recordingsOnTarget = 'right on target';
 
   // Over-target intervention (shown before the add flow when today is full)
   static const overTargetTitle = 'Already at your target';
   static String overTargetBody(int count, int target) =>
       'You have logged $count today and your target is $target. '
       'Are you truly hungry, or is this something else?';
-  static const recordingsTargetLabel = 'target'; // e.g. "target 3"
   static const dailyRecordingsTarget = 'Daily recordings target';
   static const dailyRecordingsTargetSubtitle = 'Meals you aim to log each day';
   static const recordingsTargetDialogTitle = 'Recordings per day';

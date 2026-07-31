@@ -438,8 +438,6 @@ class _HomeScreenState extends State<HomeScreen> {
     int target,
   ) {
     final theme = Theme.of(context);
-    final totals = provider.last7DaysRecordingCountsByDay;
-    final todayCount = totals.isEmpty ? 0 : totals.last;
     final streak = provider.daysOnTargetStreak(target);
 
     return Container(
@@ -452,31 +450,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _trendHeaderLabel(context, AppStrings.recordingsTrendTitle),
-              _trendHeaderSeparator(context),
-              _trendHeaderLabel(
-                context,
-                '${AppStrings.recordingsTargetLabel} $target',
-                icon: Icons.flag_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          _buildTodayLine(context, todayCount, target),
-          const SizedBox(height: 8),
-          RecordingsChart(
-            totals: totals,
-            misses: provider.last7DaysMissCountsByDay,
-            target: target,
-            loggedColor: Colors.green,
-            missColor: Colors.red,
-          ),
-          const SizedBox(height: 8),
+          // The card's only copy. Everything else the chart says for itself:
+          // the bars, the dashed target line with its value, the weekday
+          // letters, and red for the blocks that were misses.
           Wrap(
             spacing: 6,
             runSpacing: 2,
@@ -497,80 +473,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          _buildLegend(context),
+          const SizedBox(height: 8),
+          RecordingsChart(
+            totals: provider.last7DaysRecordingCountsByDay,
+            misses: provider.last7DaysMissCountsByDay,
+            target: target,
+            loggedColor: Colors.green,
+            missColor: Colors.red,
+          ),
         ],
       ),
-    );
-  }
-
-  /// The one line that answers "should I be eating right now?" — today's count
-  /// against the target, plus how much room is left.
-  Widget _buildTodayLine(BuildContext context, int count, int target) {
-    final theme = Theme.of(context);
-    final over = count - target;
-    final String suffix;
-    if (over > 0) {
-      suffix = AppStrings.recordingsOver(over);
-    } else if (over == 0) {
-      suffix = AppStrings.recordingsOnTarget;
-    } else {
-      suffix = AppStrings.recordingsLeft(-over);
-    }
-
-    return Wrap(
-      spacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          AppStrings.todayProgress(count, target),
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onSurface,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        _trendHeaderSeparator(context),
-        Text(
-          suffix,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Key for what each block's color means, since "red = a miss" isn't a
-  /// convention anyone can guess. Going over the target isn't a color — the
-  /// dashed line in the chart carries that.
-  Widget _buildLegend(BuildContext context) {
-    final theme = Theme.of(context);
-    final style = theme.textTheme.labelSmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    Widget entry(Color color, String label) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 3),
-            Text(label, style: style),
-          ],
-        );
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 2,
-      children: [
-        entry(Colors.green, AppStrings.legendLogged),
-        entry(Colors.red, AppStrings.legendMissed),
-      ],
     );
   }
 
