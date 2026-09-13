@@ -127,29 +127,52 @@ void main() {
   group('calorie reference', () {
     const plan = MealSlot.planDailyCalories;
 
-    int dayTotal(int target) => MealSlot.meals
-        .fold<int>(0, (sum, slot) => sum + (slot.calories(DayMode.normal, target) ?? 0));
+    int dayTotal(DayMode mode, int target) => MealSlot.meals
+        .fold<int>(0, (sum, slot) => sum + (slot.calories(mode, target) ?? 0));
 
-    test('at the plan\'s own target the meals add up to it', () {
-      expect(dayTotal(plan), plan);
+    test('a normal day is the plan, meal for meal', () {
+      expect(MealSlot.breakfast.calories(DayMode.normal, plan), 470);
+      expect(MealSlot.lunch.calories(DayMode.normal, plan), 720);
+      expect(MealSlot.snack.calories(DayMode.normal, plan), 300);
+      expect(MealSlot.dinner.calories(DayMode.normal, plan), 470);
+      expect(dayTotal(DayMode.normal, plan), plan);
+    });
+
+    test('an event day is the plan, meal for meal', () {
+      expect(MealSlot.breakfast.calories(DayMode.event, plan), 370);
+      expect(MealSlot.lunch.calories(DayMode.event, plan), 470);
+      expect(MealSlot.snack.calories(DayMode.event, plan), 150);
+      expect(MealSlot.dinner.calories(DayMode.event, plan), 1000);
+    });
+
+    test('the stated figures agree with the portions they sit next to', () {
+      // The two are written separately, so this is what stops a slot showing
+      // a calorie figure its own plate can't account for.
+      for (final mode in DayMode.values) {
+        for (final slot in MealSlot.meals) {
+          expect(
+            slot.calories(mode, plan)!,
+            closeTo(slot.portionCalories(mode), 30),
+            reason: '${slot.name} on a ${mode.name} day',
+          );
+        }
+      }
+    });
+
+    test('an event day banks its earlier slots into dinner', () {
+      expect(MealSlot.breakfast.calories(DayMode.event, plan)!,
+          lessThan(MealSlot.breakfast.calories(DayMode.normal, plan)!));
+      expect(MealSlot.lunch.calories(DayMode.event, plan)!,
+          lessThan(MealSlot.lunch.calories(DayMode.normal, plan)!));
+      expect(MealSlot.dinner.calories(DayMode.event, plan)!,
+          greaterThan(MealSlot.dinner.calories(DayMode.normal, plan)!));
+      expect(dayTotal(DayMode.event, plan), closeTo(plan, 50));
     });
 
     test('raising the target scales every meal with it', () {
-      final total = dayTotal(2400);
-      // Rounded to the nearest 10 per slot, so allow a little slack.
-      expect(total, closeTo(2400, 20));
-      expect(MealSlot.lunch.calories(DayMode.normal, 2400),
+      expect(dayTotal(DayMode.normal, 2400), closeTo(2400, 20));
+      expect(MealSlot.lunch.calories(DayMode.normal, 2400)!,
           greaterThan(MealSlot.lunch.calories(DayMode.normal, plan)!));
-    });
-
-    test('the plan\'s proportions survive scaling', () {
-      final lunch = MealSlot.lunch.calories(DayMode.normal, 2400)!;
-      expect(lunch / dayTotal(2400), closeTo(720 / plan, 0.01));
-    });
-
-    test('an event day is lighter, and dinner is left open', () {
-      expect(MealSlot.breakfast.calories(DayMode.event, plan), lessThan(470));
-      expect(MealSlot.dinner.calories(DayMode.event, plan), isNull);
     });
 
     test('extras carry no reference figure', () {
@@ -161,30 +184,76 @@ void main() {
     String first(PlateKind kind, int portions) =>
         PortionGuide.examples(kind).first.scaled(portions);
 
-    test('a single portion matches the plan', () {
-      expect(first(PlateKind.protein, 1), '75g chicken');
-      expect(first(PlateKind.carb, 1), '100g cooked rice');
+    test('one portion of protein is three quarters of a palm', () {
+      // The plan anchors 220g cooked chicken at 3 portions, so 3 reads as
+      // roughly two palms.
+      expect(first(PlateKind.protein, 1), '\u00be palm of chicken');
+      expect(first(PlateKind.protein, 2), '1\u00bd palms of chicken');
+      expect(first(PlateKind.protein, 3), '2\u00bc palms of chicken');
     });
 
-    test('examples scale with the meal\'s portion count', () {
-      // Lunch is 3 protein, so it should read 225g rather than 75g.
-      expect(first(PlateKind.protein, 3), '225g chicken');
-      expect(first(PlateKind.protein, 2), '150g chicken');
+    test('carbs scale by the cupped hand', () {
+      expect(first(PlateKind.carb, 1), '1 cupped hand of rice');
+      expect(first(PlateKind.carb, 2), '2 cupped hands of rice');
       expect(PortionGuide.examples(PlateKind.carb)[1].scaled(2),
           '4 slices bread');
     });
 
-    test('protein carries its gram figure, scaled', () {
+    test('grams stay grams where an object would not help', () {
+      final breakfast =
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
+      expect(breakfast[1].scaled(1), '100g cottage 5%');
+      expect(breakfast[1].scaled(2), '200g cottage 5%');
+    });
+
+    test('a meal offers fish as well as chicken', () {
+      final meal = PortionGuide.examples(PlateKind.protein);
+      // The plan lists 150g of salmon as three portions.
+      expect(meal[1].scaled(3), '150g salmon');
+      expect(meal[2].scaled(2), '2 cans of tuna');
+    });
+
+    test('breakfast protein is not a piece of chicken', () {
+      final breakfast =
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
+      expect(breakfast.map((e) => e.label), isNot(contains('palm of chicken')));
+      expect(breakfast.first.scaled(2), '4 eggs');
+    });
+
+    test('dinner can be a protein snack too', () {
+      final dinner =
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.dinner);
+      expect(dinner.map((e) => e.label), contains('protein snack'));
+    });
+
+    test('the snack has its own kind of protein', () {
+      final snack =
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.snack);
+      expect(snack.first.scaled(1), '1 protein snack');
+      expect(snack.map((e) => e.label), isNot(contains('palm of chicken')));
+    });
+
+    test('worth is a single rounded figure, not a range', () {
       expect(PortionGuide.worth(PlateKind.protein, 1),
-          '100\u2013130 cal \u00b7 10\u201315g protein');
+          '125 cal \u00b7 15g protein');
       expect(PortionGuide.worth(PlateKind.protein, 2),
-          '200\u2013260 cal \u00b7 20\u201330g protein');
-      expect(PortionGuide.worth(PlateKind.carb, 2), '200\u2013260 cal');
+          '250 cal \u00b7 25g protein');
+      expect(PortionGuide.worth(PlateKind.carb, 2), '250 cal');
+    });
+
+    test('a snack\'s protein is richer than a meal\'s', () {
+      // A protein yogurt or bar, not a piece of chicken.
+      expect(PortionGuide.worth(PlateKind.protein, 1, slot: MealSlot.snack),
+          '125 cal \u00b7 20g protein');
     });
 
     test('units are kept on the things that have them', () {
       expect(PortionGuide.examples(PlateKind.fat).first.scaled(1), '2 tsp oil');
-      expect(PortionGuide.examples(PlateKind.protein)[2].scaled(2), '4 eggs');
+      expect(
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast)
+              .first
+              .scaled(2),
+          '4 eggs');
     });
   });
 

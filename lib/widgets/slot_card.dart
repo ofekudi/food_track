@@ -11,10 +11,15 @@ import 'portion_guide_dialog.dart';
 /// One of the four meals. Filled or empty, it always holds its place — an
 /// empty dinner card at the end of the day is information.
 ///
-/// Two targets, and only two: the round button adds to the slot, and the rest
-/// of the card explains what the slot's portions mean. Nothing logs by
-/// accident.
-class SlotCard extends StatelessWidget {
+/// Once a slot has something in it the whole card folds down to just its
+/// name and a chevron. The portion legend and the reminder were there to help
+/// you decide, and the deciding is done — so the slots still open are the
+/// loudest thing on screen. Tap to unfold and see, edit or delete what's
+/// there; the round button still adds.
+///
+/// Nothing logs by accident: the round button is the only thing that opens
+/// the log dialog.
+class SlotCard extends StatefulWidget {
   final MealSlot slot;
   final DayMode mode;
   final int dailyCalories;
@@ -35,100 +40,140 @@ class SlotCard extends StatelessWidget {
   });
 
   @override
+  State<SlotCard> createState() => _SlotCardState();
+}
+
+class _SlotCardState extends State<SlotCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final slot = widget.slot;
+    final mode = widget.mode;
+    final entries = widget.entries;
+
     final theme = Theme.of(context);
     final plate = slot.plate(mode);
     final insight = AppInsights.forSlot(slot, mode);
     final isFilled = entries.isNotEmpty;
-    final calories = slot.calories(mode, dailyCalories);
+    final calories = slot.calories(mode, widget.dailyCalories);
+    final showDetail = !isFilled || _expanded;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => showSlotPortions(context, slot, mode),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Plate(segments: plate),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    Text(
-                                      slot.displayName,
-                                      style:
-                                          theme.textTheme.titleSmall?.copyWith(
-                                        color: isFilled
-                                            ? theme.colorScheme.onSurface
-                                            : theme
-                                                .colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    if (calories != null) ...[
-                                      const SizedBox(width: 6),
+      margin: EdgeInsets.symmetric(horizontal: 12, vertical: isFilled ? 2 : 5),
+      elevation: isFilled ? 0 : null,
+      color: isFilled
+          ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+          : null,
+      child: Opacity(
+        // Dims the whole row, not just the plate: a slot you've dealt with
+        // should recede as one thing, so the open ones carry the screen.
+        opacity: isFilled ? 0.35 : 1,
+        child: Padding(
+          padding:
+              EdgeInsets.fromLTRB(14, isFilled ? 2 : 12, 12, isFilled ? 2 : 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      // Once it's filled the card folds, so tapping it
+                      // unfolds; while it's empty the portions are what you
+                      // want to see.
+                      onTap: isFilled
+                          ? () => setState(() => _expanded = !_expanded)
+                          : () => showSlotPortions(context, slot, mode),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(vertical: isFilled ? 0 : 4),
+                        child: Row(
+                          children: [
+                            Plate(segments: plate, size: isFilled ? 22 : 38),
+                            SizedBox(width: isFilled ? 10 : 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
                                       Text(
-                                        AppStrings.calories(calories),
-                                        style:
-                                            theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.outline,
+                                        slot.displayName,
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                          color: isFilled
+                                              ? theme.colorScheme.onSurface
+                                              : theme
+                                                  .colorScheme.onSurfaceVariant,
                                         ),
                                       ),
+                                      if (isFilled) ...[
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          _expanded
+                                              ? Icons.keyboard_arrow_up
+                                              : Icons.keyboard_arrow_down,
+                                          size: 18,
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant,
+                                        ),
+                                      ] else if (calories != null) ...[
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          AppStrings.calories(calories),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: theme.colorScheme.outline,
+                                          ),
+                                        ),
+                                      ],
                                     ],
+                                  ),
+                                  if (!isFilled) ...[
+                                    const SizedBox(height: 2),
+                                    PlateLegend(segments: plate),
                                   ],
-                                ),
-                                const SizedBox(height: 2),
-                                PlateLegend(segments: plate),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                _AddButton(onTap: onAdd),
+                  const SizedBox(width: 4),
+                  _AddButton(onTap: widget.onAdd, size: isFilled ? 32 : 52),
+                ],
+              ),
+              if (isFilled && _expanded) ...[
+                const SizedBox(height: 6),
+                for (final entry in entries)
+                  _EntryLine(
+                    entry: entry,
+                    onEdit: () => widget.onEditEntry(entry),
+                    onDelete: () => widget.onDeleteEntry(entry),
+                  ),
               ],
-            ),
-            if (isFilled) ...[
-              const SizedBox(height: 6),
-              for (final entry in entries)
-                _EntryLine(
-                  entry: entry,
-                  onEdit: () => onEditEntry(entry),
-                  onDelete: () => onDeleteEntry(entry),
-                ),
-            ],
-            if (insight != null) ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(left: 48, right: 8),
-                child: Text(
-                  insight,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
+              if (insight != null && showDetail && !isFilled) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 48, right: 8),
+                  child: Text(
+                    insight,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -139,7 +184,10 @@ class SlotCard extends StatelessWidget {
 class _AddButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _AddButton({required this.onTap});
+  /// Shrinks with the rest of the row once the slot is dealt with.
+  final double size;
+
+  const _AddButton({required this.onTap, this.size = 52});
 
   @override
   Widget build(BuildContext context) {
@@ -153,9 +201,9 @@ class _AddButton extends StatelessWidget {
         child: Tooltip(
           message: AppStrings.addToSlot,
           child: SizedBox(
-            width: 52,
-            height: 52,
-            child: Icon(Icons.add, size: 30, color: scheme.onPrimary),
+            width: size,
+            height: size,
+            child: Icon(Icons.add, size: size * 0.58, color: scheme.onPrimary),
           ),
         ),
       ),

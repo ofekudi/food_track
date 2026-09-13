@@ -17,7 +17,11 @@ void showSlotPortions(BuildContext context, MealSlot slot, DayMode mode) {
       title: slot.displayName,
       rows: [
         for (final segment in plate)
-          _PortionRow(kind: segment.kind, count: segment.portions),
+          _PortionRow(
+            kind: segment.kind,
+            count: segment.portions,
+            slot: slot,
+          ),
       ],
     ),
   );
@@ -56,16 +60,13 @@ class _PortionDialog extends StatelessWidget {
 class _PortionRow extends StatelessWidget {
   final PlateKind kind;
   final int? count;
+  final MealSlot? slot;
 
-  const _PortionRow({required this.kind, this.count});
+  const _PortionRow({required this.kind, this.count, this.slot});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = count == null
-        ? kind.displayName
-        : '$count ${kind.displayName.toLowerCase()}';
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -89,11 +90,11 @@ class _PortionRow extends StatelessWidget {
               children: [
                 Text.rich(
                   TextSpan(
-                    text: label,
+                    text: kind.displayName,
                     style: theme.textTheme.titleSmall,
                     children: [
                       TextSpan(
-                        text: '  ${PortionGuide.worth(kind, count ?? 1)}',
+                        text: '  ${PortionGuide.worth(kind, count ?? 1, slot: slot)}',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.outline),
                       ),
@@ -102,7 +103,7 @@ class _PortionRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  PortionGuide.examples(kind)
+                  PortionGuide.examples(kind, slot: slot)
                       .map((example) => example.scaled(count ?? 1))
                       .join(', '),
                   style: theme.textTheme.bodyMedium

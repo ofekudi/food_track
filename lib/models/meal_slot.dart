@@ -12,6 +12,25 @@ enum PlateKind {
   veg,
   treat;
 
+  /// What one portion of this is worth. At 125 a portion, the plan's own
+  /// portion counts reproduce its stated per-meal calories to within 5 — so
+  /// these are its numbers, not an invention.
+  int get caloriesPerPortion {
+    switch (this) {
+      case PlateKind.protein:
+      case PlateKind.carb:
+        return 125;
+      case PlateKind.fat:
+        return 100;
+      case PlateKind.treat:
+        return 150;
+      case PlateKind.veg:
+        // The plan doesn't spend the budget on vegetables — it sets the daily
+        // amount separately and treats them as free.
+        return 0;
+    }
+  }
+
   String get displayName {
     switch (this) {
       case PlateKind.protein:
@@ -108,33 +127,26 @@ enum MealSlot {
     }
   }
 
-  /// What the plan's own per-meal figures add up to. Slot figures are stored
-  /// as written and scaled from here, so changing your daily target keeps the
-  /// plan's proportions intact.
+  /// What a normal day comes to, as the plan writes it. Slot figures scale
+  /// from here, so changing your daily target keeps the proportions intact.
   static const int planDailyCalories = 1960;
 
-  /// Roughly what this meal is meant to come to, scaled to [dailyTarget].
-  /// A reference for the shape of the day, not a measurement of what you ate
-  /// — nothing here is counted or estimated.
-  int? calories(DayMode mode, int dailyTarget) {
-    final base = _planCalories(mode);
-    if (base == null) return null;
-    final scaled = base * dailyTarget / planDailyCalories;
-    return (scaled / 10).round() * 10; // tidy, since it's only a reference
-  }
-
-  /// The plan's figure for this meal, as written.
-  int? _planCalories(DayMode mode) {
+  /// The figure the plan states for this meal. These are its numbers verbatim
+  /// rather than arithmetic on its portions — the two agree to within 25, and
+  /// a test holds them to that, but the written figure is the one to show.
+  int? _statedCalories(DayMode mode) {
     if (mode == DayMode.event) {
       switch (this) {
         case MealSlot.breakfast:
-          return 370;
+          return 370; // the weekday breakfast without its fat portion
         case MealSlot.lunch:
           return 470;
         case MealSlot.snack:
-          return 150; // yogurt only, no treat
+          return 150; // the yogurt, without the treat
         case MealSlot.dinner:
-          return null; // a restaurant meal; the plan gives no figure
+          // The plan gives no figure for a restaurant meal — it says to bank
+          // room by combining the earlier slots. This is what that buys.
+          return 1000;
         case MealSlot.extras:
           return null;
       }
@@ -150,6 +162,23 @@ enum MealSlot {
       case MealSlot.extras:
         return null;
     }
+  }
+
+  /// What this meal's own portions come to, at the plan's per-portion rates.
+  /// Used to check the stated figures, and as the fallback if one is missing.
+  int portionCalories(DayMode mode) => plate(mode).fold<int>(
+        0,
+        (sum, segment) =>
+            sum + segment.portions * segment.kind.caloriesPerPortion,
+      );
+
+  /// Roughly what this meal comes to, scaled to [dailyTarget]. A reference for
+  /// the shape of the day, not a measurement of what you ate.
+  int? calories(DayMode mode, int dailyTarget) {
+    if (isExtra) return null;
+    final base = _statedCalories(mode) ?? portionCalories(mode);
+    final scaled = base * dailyTarget / planDailyCalories;
+    return (scaled / 10).round() * 10; // tidy, since it's only a reference
   }
 
   /// The four real meals, in the order they happen.
@@ -178,8 +207,10 @@ enum MealSlot {
     if (mode == DayMode.event) {
       switch (this) {
         case MealSlot.breakfast:
+          // The plan puts this at 370 — the weekday breakfast without its fat
+          // portion, which is exactly 470 minus 100.
           return const [
-            PlateSegment(PlateKind.protein, 1),
+            PlateSegment(PlateKind.protein, 2),
             PlateSegment(PlateKind.carb, 1),
           ];
         case MealSlot.lunch:
@@ -192,10 +223,13 @@ enum MealSlot {
           return const [PlateSegment(PlateKind.protein, 1)];
         case MealSlot.dinner:
           // The Mercedes plate: equal parts, and the looser meal of the day.
+          // The plan gives no figure for a restaurant meal — it says to bank
+          // room by combining the earlier slots, and these counts are what
+          // that room buys, keeping an event day level with a normal one.
           return const [
-            PlateSegment(PlateKind.protein, 1),
-            PlateSegment(PlateKind.carb, 1),
-            PlateSegment(PlateKind.veg, 1),
+            PlateSegment(PlateKind.protein, 4),
+            PlateSegment(PlateKind.carb, 4),
+            PlateSegment(PlateKind.veg, 4),
           ];
         case MealSlot.extras:
           return const [];

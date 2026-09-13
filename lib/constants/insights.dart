@@ -32,6 +32,13 @@ class AppInsights {
 
   static const _breakfastIdeas = ['Shake', 'Yogurt'];
 
+  static const _dinnerIdeas = [
+    'Home Special',
+    'Bolognese',
+    'Yogurt',
+    'Shake',
+  ];
+
   /// Starter chips for a slot, for before your own history fills in. Kept to
   /// one or two words so the row doesn't wrap.
   static List<String> ideasFor(MealSlot slot) {
@@ -40,8 +47,9 @@ class AppInsights {
         return _breakfastIdeas;
       case MealSlot.snack:
         return _treatIdeas;
-      case MealSlot.lunch:
       case MealSlot.dinner:
+        return _dinnerIdeas;
+      case MealSlot.lunch:
       case MealSlot.extras:
         return const [];
     }
