@@ -110,6 +110,4 @@ class DayProvider with ChangeNotifier {
     await load();
   }
 
-  Future<List<String>> suggestionsFor(MealSlot slot) =>
-      _db.suggestionsForSlot(slot);
 }

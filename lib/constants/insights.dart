@@ -32,11 +32,13 @@ class AppInsights {
 
   static const _breakfastIdeas = ['Shake', 'Yogurt'];
 
+  static const _lunchIdeas = ['Chicken Salad', 'Schnitzels'];
+
   static const _dinnerIdeas = [
     'Home Special',
-    'Bolognese',
-    'Yogurt',
     'Shake',
+    'Yogurt',
+    'Bolognese',
   ];
 
   /// Starter chips for a slot, for before your own history fills in. Kept to
@@ -50,6 +52,7 @@ class AppInsights {
       case MealSlot.dinner:
         return _dinnerIdeas;
       case MealSlot.lunch:
+        return _lunchIdeas;
       case MealSlot.extras:
         return const [];
     }

@@ -23,8 +23,11 @@ class PortionExample {
       final grams = (total / 5).round() * 5;
       return '${grams}g $label';
     }
-    final name = total > 1 ? (plural ?? label) : label;
-    final quantity = _format(total);
+    // Snapped to a quarter: a palm is an eyeball measure, and "0.8 palms"
+    // would be false precision.
+    final rounded = (total * 4).round() / 4;
+    final name = rounded > 1 ? (plural ?? label) : label;
+    final quantity = _format(rounded);
     return unit.isEmpty ? '$quantity $name' : '$quantity $unit $name';
   }
 
@@ -85,11 +88,31 @@ class PortionGuide {
   /// Examples of [kind], optionally tailored to the slot they're eaten in —
   /// the snack's protein is a yogurt or a bar, not a palm of chicken.
   static List<PortionExample> examples(PlateKind kind, {MealSlot? slot}) {
-    if (slot == MealSlot.breakfast && kind == PlateKind.protein) {
+    if (slot == MealSlot.breakfast) {
+      switch (kind) {
+        case PlateKind.protein:
+          // A scoop is ~25g of protein, so it covers two of the plan's
+          // portions on its own.
+          return const [
+            PortionExample(1.5, '', 'eggs'),
+            PortionExample(125, 'g', 'cottage 5%'),
+            PortionExample(0.5, '', 'whey scoop', plural: 'whey scoops'),
+          ];
+        case PlateKind.carb:
+          return const [
+            PortionExample(2, '', 'slices bread'),
+            PortionExample(1, '', 'pita'),
+            PortionExample(1, '', 'fruit'),
+          ];
+        default:
+          break;
+      }
+    }
+    if (slot == MealSlot.lunch && kind == PlateKind.carb) {
       return const [
-        PortionExample(2, '', 'eggs'),
-        PortionExample(100, 'g', 'cottage 5%'),
-        PortionExample(1, '', 'whey scoop', plural: 'whey scoops'),
+        PortionExample(1, '', 'fistful of rice', plural: 'fistfuls of rice'),
+        PortionExample(75, 'g', 'pasta'),
+        PortionExample(1, '', 'small potato', plural: 'small potatoes'),
       ];
     }
     if (slot == MealSlot.snack && kind == PlateKind.protein) {
@@ -99,41 +122,38 @@ class PortionGuide {
       ];
     }
     if (slot == MealSlot.dinner && kind == PlateKind.protein) {
+      // A dinner's protein is often built from a couple of things rather than
+      // one piece of meat, so eggs, cottage and a scoop sit alongside the meat.
       return const [
-        PortionExample(0.75, '', 'palm of chicken', plural: 'palms of chicken'),
-        PortionExample(50, 'g', 'salmon'),
-        PortionExample(1, '', 'protein snack', plural: 'protein snacks'),
+        PortionExample(5 / 6, '', 'palm of chicken', plural: 'palms of chicken'),
+        PortionExample(0.5, '', 'palm of salmon', plural: 'palms of salmon'),
+        PortionExample(1.5, '', 'eggs'),
+        PortionExample(125, 'g', 'cottage 5%'),
+        PortionExample(0.5, '', 'whey scoop', plural: 'whey scoops'),
       ];
     }
     switch (kind) {
       case PlateKind.protein:
-        // Lunch and dinner. The plan anchors 220g cooked lean chicken at 3
-        // portions, so one is ~75g — about three quarters of a palm, and
-        // noticeably less than the whole palm-sized piece people picture.
-        // Salmon is richer, so its portion is smaller: the plan's 150g at 3
-        // portions works out at 50g.
+        // Lunch. The plan anchors 220g cooked lean chicken at 3 portions, so
+        // three reads as about two and a half palms. Salmon is richer, so its
+        // palm goes further.
         return const [
-          PortionExample(0.75, '', 'palm of chicken',
+          PortionExample(5 / 6, '', 'palm of chicken',
               plural: 'palms of chicken'),
-          PortionExample(50, 'g', 'salmon'),
+          PortionExample(0.5, '', 'palm of salmon', plural: 'palms of salmon'),
           PortionExample(1, '', 'can of tuna', plural: 'cans of tuna'),
         ];
       case PlateKind.carb:
-        // 200g cooked rice (8 flat tbsp) = 2 portions, per the plan, so one
-        // portion is a cupped hand.
         return const [
-          PortionExample(1, '', 'cupped hand of rice',
-              plural: 'cupped hands of rice'),
+          PortionExample(1, '', 'fistful of rice', plural: 'fistfuls of rice'),
           PortionExample(2, '', 'slices bread'),
           PortionExample(1, '', 'fruit'),
         ];
       case PlateKind.fat:
-        // All three are the plan's own: 2 tsp oil, or a flat tbsp of tahini
-        // or hummus.
+        // Both the plan's own: 2 tsp of oil, or a flat tbsp of tahini.
         return const [
           PortionExample(2, 'tsp', 'oil'),
           PortionExample(1, 'tbsp', 'tahini'),
-          PortionExample(1, 'tbsp', 'hummus'),
         ];
       case PlateKind.veg:
         return const [

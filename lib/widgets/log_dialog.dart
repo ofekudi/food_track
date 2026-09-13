@@ -14,18 +14,9 @@ import '../models/meal_slot.dart';
 /// this app guards against is not logging at all.
 class LogDialog extends StatefulWidget {
   final MealSlot slot;
-
-  /// What you've logged in this slot before, most-used first.
-  final List<String> suggestions;
-
   final String? initialText;
 
-  const LogDialog({
-    super.key,
-    required this.slot,
-    this.suggestions = const [],
-    this.initialText,
-  });
+  const LogDialog({super.key, required this.slot, this.initialText});
 
   @override
   State<LogDialog> createState() => _LogDialogState();
@@ -36,14 +27,6 @@ class _LogDialogState extends State<LogDialog> {
       TextEditingController(text: widget.initialText ?? '');
 
   bool get _canSave => _controller.text.trim().isNotEmpty;
-
-  /// Your own history first, then the plan's starters for anything you haven't
-  /// logged yet.
-  List<String> get _chips {
-    final ideas = AppInsights.ideasFor(widget.slot)
-        .where((idea) => !widget.suggestions.contains(idea));
-    return [...widget.suggestions, ...ideas];
-  }
 
   @override
   void dispose() {
@@ -56,7 +39,11 @@ class _LogDialogState extends State<LogDialog> {
     Navigator.of(context).pop(_controller.text.trim());
   }
 
-  void _use(String text) {
+  /// Appends rather than replaces, so a meal can be built from more than one
+  /// chip — "Home Special" then "Shake" gives "Home Special, Shake".
+  void _use(String chip) {
+    final current = _controller.text.trim();
+    final text = current.isEmpty ? chip : '$current, $chip';
     _controller.value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(offset: text.length),
@@ -66,7 +53,7 @@ class _LogDialogState extends State<LogDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final chips = _chips;
+    final chips = AppInsights.ideasFor(widget.slot);
 
     return AlertDialog(
       scrollable: true,

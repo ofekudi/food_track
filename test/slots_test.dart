@@ -184,32 +184,46 @@ void main() {
     String first(PlateKind kind, int portions) =>
         PortionGuide.examples(kind).first.scaled(portions);
 
-    test('one portion of protein is three quarters of a palm', () {
-      // The plan anchors 220g cooked chicken at 3 portions, so 3 reads as
-      // roughly two palms.
+    test('protein scales by the palm, snapped to a quarter', () {
+      // The plan anchors 220g cooked chicken at 3 portions, so a lunch reads
+      // as two and a half palms — never as "2.5 palms" or "0.8".
       expect(first(PlateKind.protein, 1), '\u00be palm of chicken');
-      expect(first(PlateKind.protein, 2), '1\u00bd palms of chicken');
-      expect(first(PlateKind.protein, 3), '2\u00bc palms of chicken');
+      expect(first(PlateKind.protein, 3), '2\u00bd palms of chicken');
     });
 
-    test('carbs scale by the cupped hand', () {
-      expect(first(PlateKind.carb, 1), '1 cupped hand of rice');
-      expect(first(PlateKind.carb, 2), '2 cupped hands of rice');
-      expect(PortionGuide.examples(PlateKind.carb)[1].scaled(2),
-          '4 slices bread');
+    test('carbs scale by the fistful', () {
+      expect(first(PlateKind.carb, 1), '1 fistful of rice');
+      expect(first(PlateKind.carb, 2), '2 fistfuls of rice');
+    });
+
+    test('lunch carbs are lunch food, breakfast carbs are breakfast food', () {
+      final lunch =
+          PortionGuide.examples(PlateKind.carb, slot: MealSlot.lunch);
+      expect(lunch.map((e) => e.label), isNot(contains('slices bread')));
+      final breakfast =
+          PortionGuide.examples(PlateKind.carb, slot: MealSlot.breakfast);
+      expect(breakfast.map((e) => e.label), isNot(contains('fistful of rice')));
+    });
+
+    test('a whey scoop covers two portions', () {
+      // A scoop is ~25g of protein, twice the plan's per-portion figure.
+      final breakfast =
+          PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
+      expect(breakfast.last.scaled(2), '1 whey scoop');
+      expect(breakfast.last.scaled(1), '\u00bd whey scoop');
     });
 
     test('grams stay grams where an object would not help', () {
       final breakfast =
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
-      expect(breakfast[1].scaled(1), '100g cottage 5%');
-      expect(breakfast[1].scaled(2), '200g cottage 5%');
+      // Cottage is 11g protein per 100g, so 250g is the two-portion figure.
+      expect(breakfast[1].scaled(1), '125g cottage 5%');
+      expect(breakfast[1].scaled(2), '250g cottage 5%');
     });
 
     test('a meal offers fish as well as chicken', () {
       final meal = PortionGuide.examples(PlateKind.protein);
-      // The plan lists 150g of salmon as three portions.
-      expect(meal[1].scaled(3), '150g salmon');
+      expect(meal[1].scaled(3), '1\u00bd palms of salmon');
       expect(meal[2].scaled(2), '2 cans of tuna');
     });
 
@@ -217,13 +231,14 @@ void main() {
       final breakfast =
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
       expect(breakfast.map((e) => e.label), isNot(contains('palm of chicken')));
-      expect(breakfast.first.scaled(2), '4 eggs');
+      expect(breakfast.first.scaled(2), '3 eggs');
     });
 
-    test('dinner can be a protein snack too', () {
+    test('dinner protein can be built from a few things', () {
       final dinner =
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.dinner);
-      expect(dinner.map((e) => e.label), contains('protein snack'));
+      expect(dinner.map((e) => e.label), contains('eggs'));
+      expect(dinner.map((e) => e.label), contains('whey scoop'));
     });
 
     test('the snack has its own kind of protein', () {
@@ -253,7 +268,7 @@ void main() {
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast)
               .first
               .scaled(2),
-          '4 eggs');
+          '3 eggs');
     });
   });
 

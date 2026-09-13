@@ -114,22 +114,6 @@ class DBHelper {
     await db.delete('entries', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// What you've logged in this slot before, most-used first. This is what
-  /// turns repeat meals into a single tap — and it's why the app never needs
-  /// a "create a preset" screen.
-  Future<List<String>> suggestionsForSlot(MealSlot slot, {int limit = 8}) async {
-    final db = await database;
-    final rows = await db.rawQuery('''
-      SELECT text, COUNT(*) AS uses, MAX(created_at) AS last_used
-      FROM entries
-      WHERE slot = ?
-      GROUP BY text
-      ORDER BY uses DESC, last_used DESC
-      LIMIT ?
-    ''', [slot.name, limit]);
-    return rows.map((r) => r['text'] as String).toList();
-  }
-
   // === Days ===
 
   Future<DayMode> modeForDate(DateTime date) async {

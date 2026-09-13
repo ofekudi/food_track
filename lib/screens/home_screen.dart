@@ -21,12 +21,9 @@ class HomeScreen extends StatelessWidget {
 
   Future<void> _log(BuildContext context, MealSlot slot) async {
     final provider = context.read<DayProvider>();
-    final suggestions = await provider.suggestionsFor(slot);
-    if (!context.mounted) return;
-
     final text = await showDialog<String>(
       context: context,
-      builder: (_) => LogDialog(slot: slot, suggestions: suggestions),
+      builder: (_) => LogDialog(slot: slot),
     );
     if (text == null) return;
 
@@ -35,16 +32,9 @@ class HomeScreen extends StatelessWidget {
 
   Future<void> _edit(BuildContext context, Entry entry) async {
     final provider = context.read<DayProvider>();
-    final suggestions = await provider.suggestionsFor(entry.slot);
-    if (!context.mounted) return;
-
     final text = await showDialog<String>(
       context: context,
-      builder: (_) => LogDialog(
-        slot: entry.slot,
-        suggestions: suggestions,
-        initialText: entry.text,
-      ),
+      builder: (_) => LogDialog(slot: entry.slot, initialText: entry.text),
     );
     if (text == null) return;
     await provider.updateEntryText(entry.id, text);
