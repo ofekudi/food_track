@@ -1,195 +1,168 @@
-import 'package:intl/intl.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'models/eating_log.dart';
+import 'models/day_mode.dart';
+import 'models/entry.dart';
+import 'models/meal_slot.dart';
 
+/// Storage for the slot tracker.
+///
+/// This is a fresh database rather than a migration of the old
+/// `food_tracking.db` — the previous schema tracked a different method
+/// entirely, and none of its rows mean anything here. The old file is left
+/// untouched on disk.
 class DBHelper {
   static final DBHelper _instance = DBHelper._internal();
   static Database? _database;
-  static const uuid = Uuid();
+  static const _uuid = Uuid();
 
   factory DBHelper() => _instance;
 
   DBHelper._internal();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
+    _database ??= await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'food_tracking.db');
-    return await openDatabase(
-      path,
-      version: 3, // v3: add is_miss column
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    final path = join(await getDatabasesPath(), 'slots.db');
+    return openDatabase(path, version: 1, onCreate: _onCreate);
   }
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE eating_logs(
-        id TEXT PRIMARY KEY,
-        description TEXT NOT NULL,
-        hunger_level INTEGER NOT NULL,
-        reason TEXT NOT NULL,
-        entry_date TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        is_miss INTEGER NOT NULL DEFAULT 0
+      CREATE TABLE days(
+        date TEXT PRIMARY KEY,
+        mode TEXT NOT NULL DEFAULT 'normal'
       )
     ''');
-    await db.execute('CREATE INDEX idx_eating_logs_entry_date ON eating_logs(entry_date);');
-    await db.execute('CREATE INDEX idx_eating_logs_created_at ON eating_logs(created_at);');
+    await db.execute('''
+      CREATE TABLE entries(
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        slot TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX idx_entries_date ON entries(date)');
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Migration from version 1 (old food tracking schema) to version 2 (mindful eating)
-      // Create new eating_logs table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS eating_logs(
-          id TEXT PRIMARY KEY,
-          description TEXT NOT NULL,
-          hunger_level INTEGER NOT NULL,
-          reason TEXT NOT NULL,
-          entry_date TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        )
-      ''');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_eating_logs_entry_date ON eating_logs(entry_date);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_eating_logs_created_at ON eating_logs(created_at);');
+  // === Entries ===
 
-      // Migrate existing food_entries to eating_logs
-      // We'll convert them with default hunger_level=3 and reason='hungry'
-      try {
-        final oldEntries = await db.query('food_entries');
-        for (var entry in oldEntries) {
-          await db.insert('eating_logs', {
-            'id': entry['id'],
-            'description': entry['name'],
-            'hunger_level': 3, // Default middle hunger
-            'reason': 'hungry', // Default reason
-            'entry_date': entry['entry_date'],
-            'created_at': entry['created_at'],
-          });
-        }
-      } catch (e) {
-        // Old table might not exist, that's okay
-      }
-
-      // Drop old tables
-      try {
-        await db.execute('DROP TABLE IF EXISTS food_entries');
-        await db.execute('DROP TABLE IF EXISTS daily_summaries');
-        await db.execute('DROP TABLE IF EXISTS favorites');
-      } catch (e) {
-        // Tables might not exist
-      }
-    }
-
-    if (oldVersion < 3) {
-      // Additive: flag for quick-logged "miss" entries. Existing rows default to 0.
-      try {
-        await db.execute(
-            'ALTER TABLE eating_logs ADD COLUMN is_miss INTEGER NOT NULL DEFAULT 0');
-      } catch (e) {
-        // Column may already exist; ignore.
-      }
-    }
-  }
-
-  // === Eating Log Methods ===
-
-  Future<String> addEatingLog({
-    required String description,
-    required int hungerLevel,
-    required EatingReason reason,
-    required DateTime entryDate,
+  Future<Entry> addEntry({
+    required DateTime date,
+    required MealSlot slot,
+    required String text,
   }) async {
-    final Database db = await database;
-    final String id = uuid.v4();
+    final db = await database;
+    final entry = Entry(
+      id: _uuid.v4(),
+      date: formatDay(date),
+      slot: slot,
+      text: text,
+      createdAt: _timestampFor(date, slot),
+    );
+    await db.insert('entries', entry.toMap());
+    return entry;
+  }
+
+  /// Back-filling yesterday at 23:00 shouldn't make breakfast sort last, so
+  /// an entry logged for a past day is stamped at that slot's usual time
+  /// instead of right now.
+  DateTime _timestampFor(DateTime date, MealSlot slot) {
     final now = DateTime.now();
-    final String entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return now;
+    }
+    return DateTime(date.year, date.month, date.day)
+        .add(Duration(minutes: slot.defaultMinutes));
+  }
 
+  Future<List<Entry>> entriesForDate(DateTime date) async {
+    final db = await database;
+    final rows = await db.query(
+      'entries',
+      where: 'date = ?',
+      whereArgs: [formatDay(date)],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  /// Every entry from [from] onward, for the week strip and the streak.
+  Future<List<Entry>> entriesSince(DateTime from) async {
+    final db = await database;
+    final rows = await db.query(
+      'entries',
+      where: 'date >= ?',
+      whereArgs: [formatDay(from)],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  Future<void> updateEntryText(String id, String text) async {
+    final db = await database;
+    await db.update('entries', {'text': text},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteEntry(String id) async {
+    final db = await database;
+    await db.delete('entries', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// What you've logged in this slot before, most-used first. This is what
+  /// turns repeat meals into a single tap — and it's why the app never needs
+  /// a "create a preset" screen.
+  Future<List<String>> suggestionsForSlot(MealSlot slot, {int limit = 8}) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT text, COUNT(*) AS uses, MAX(created_at) AS last_used
+      FROM entries
+      WHERE slot = ?
+      GROUP BY text
+      ORDER BY uses DESC, last_used DESC
+      LIMIT ?
+    ''', [slot.name, limit]);
+    return rows.map((r) => r['text'] as String).toList();
+  }
+
+  // === Days ===
+
+  Future<DayMode> modeForDate(DateTime date) async {
+    final db = await database;
+    final rows = await db.query(
+      'days',
+      where: 'date = ?',
+      whereArgs: [formatDay(date)],
+      limit: 1,
+    );
+    if (rows.isEmpty) return DayMode.normal;
+    return DayMode.fromString(rows.first['mode'] as String?);
+  }
+
+  Future<void> setModeForDate(DateTime date, DayMode mode) async {
+    final db = await database;
     await db.insert(
-      'eating_logs',
-      {
-        'id': id,
-        'description': description,
-        'hunger_level': hungerLevel.clamp(1, 5),
-        'reason': reason.name,
-        'entry_date': entryDateStr,
-        'created_at': now.toIso8601String(),
-        'is_miss': 0,
-      },
-    );
-
-    return id;
-  }
-
-  /// Quick-log a "miss" — the user ate but forgot to document it mindfully.
-  /// Only the typed [description] matters; hunger/reason are neutral placeholders.
-  Future<String> addMiss({
-    required String description,
-    required DateTime entryDate,
-  }) async {
-    final Database db = await database;
-    final String id = uuid.v4();
-    final now = DateTime.now();
-    final String entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
-
-    await db.insert(
-      'eating_logs',
-      {
-        'id': id,
-        'description': description,
-        'hunger_level': 0, // N/A for a miss
-        'reason': 'hungry', // placeholder, ignored for misses
-        'entry_date': entryDateStr,
-        'created_at': now.toIso8601String(),
-        'is_miss': 1,
-      },
-    );
-
-    return id;
-  }
-
-  Future<List<Map<String, dynamic>>> getEatingLogsForDate(DateTime date) async {
-    final Database db = await database;
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    return await db.query(
-      'eating_logs',
-      where: 'entry_date = ?',
-      whereArgs: [dateStr],
-      orderBy: 'created_at DESC',
-    );
-  }
-
-  Future<void> deleteEatingLog(String id) async {
-    final Database db = await database;
-    await db.delete(
-      'eating_logs',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<void> updateEatingLog(EatingLog log) async {
-    final Database db = await database;
-    await db.update(
-      'eating_logs',
-      log.toMap(),
-      where: 'id = ?',
-      whereArgs: [log.id],
+      'days',
+      {'date': formatDay(date), 'mode': mode.name},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<List<Map<String, dynamic>>> getAllEatingLogs() async {
-    final Database db = await database;
-    return await db.query('eating_logs', orderBy: 'created_at DESC');
+  Future<Map<String, DayMode>> modesSince(DateTime from) async {
+    final db = await database;
+    final rows = await db.query(
+      'days',
+      where: 'date >= ?',
+      whereArgs: [formatDay(from)],
+    );
+    return {
+      for (final row in rows)
+        row['date'] as String: DayMode.fromString(row['mode'] as String?),
+    };
   }
 }

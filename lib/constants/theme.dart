@@ -1,35 +1,23 @@
 import 'package:flutter/material.dart';
+import '../models/meal_slot.dart';
 
-/// App-wide theme constants
+/// App-wide theme constants.
 class AppTheme {
-  // Hunger indicator color (for list items)
-  static Color hungerIndicatorColor(int level) {
-    if (level <= 2) {
-      return Colors.orange;
-    } else if (level >= 4) {
-      return Colors.green;
-    } else {
-      return Colors.blue;
-    }
-  }
-
-  // Reason icons
-  static IconData reasonIcon(String reason) {
-    switch (reason) {
-      case 'hungry':
-        return Icons.restaurant;
-      case 'bored':
-        return Icons.mood_bad;
-      case 'craving':
-        return Icons.favorite;
-      case 'social':
-        return Icons.people;
-      case 'habit':
-        return Icons.repeat;
-      case 'drink':
-        return Icons.local_cafe;
-      default:
-        return Icons.help_outline;
+  /// Colour for one wedge of a composition plate. Deliberately saturated and
+  /// distinct rather than shades of the seed colour — the plate has to read at
+  /// 36px.
+  static Color plateColor(PlateKind kind) {
+    switch (kind) {
+      case PlateKind.protein:
+        return const Color(0xFFFF3D00);
+      case PlateKind.carb:
+        return const Color(0xFFFFC400);
+      case PlateKind.fat:
+        return const Color(0xFF2979FF);
+      case PlateKind.veg:
+        return const Color(0xFF00E676);
+      case PlateKind.treat:
+        return const Color(0xFFD500F9);
     }
   }
 }
