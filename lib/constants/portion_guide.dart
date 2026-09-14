@@ -91,12 +91,11 @@ class PortionGuide {
     if (slot == MealSlot.breakfast) {
       switch (kind) {
         case PlateKind.protein:
-          // A scoop is ~25g of protein, so it covers two of the plan's
-          // portions on its own.
+          // Breakfast is two portions, so the yogurt reads as the 200g tub.
           return const [
             PortionExample(1.5, '', 'eggs'),
             PortionExample(125, 'g', 'cottage 5%'),
-            PortionExample(0.5, '', 'whey scoop', plural: 'whey scoops'),
+            PortionExample(100, 'g', 'Greek yogurt 0%'),
           ];
         case PlateKind.carb:
           return const [
@@ -109,9 +108,13 @@ class PortionGuide {
       }
     }
     if (slot == MealSlot.lunch && kind == PlateKind.carb) {
+      // Lunch is two carb portions, which is where the plan's own measures
+      // land: 8 flat spoons of rice, or the same as 2 serving spoons.
       return const [
-        PortionExample(1, '', 'fistful of rice', plural: 'fistfuls of rice'),
-        PortionExample(75, 'g', 'pasta'),
+        PortionExample(4, '', 'flat spoons of rice'),
+        PortionExample(1, '', 'serving spoon of rice',
+            plural: 'serving spoons of rice'),
+        PortionExample(75, 'g', 'pasta or ptitim'),
         PortionExample(1, '', 'small potato', plural: 'small potatoes'),
       ];
     }
@@ -141,7 +144,6 @@ class PortionGuide {
           PortionExample(5 / 6, '', 'palm of chicken',
               plural: 'palms of chicken'),
           PortionExample(0.5, '', 'palm of salmon', plural: 'palms of salmon'),
-          PortionExample(1, '', 'can of tuna', plural: 'cans of tuna'),
         ];
       case PlateKind.carb:
         return const [

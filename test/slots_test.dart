@@ -196,21 +196,28 @@ void main() {
       expect(first(PlateKind.carb, 2), '2 fistfuls of rice');
     });
 
+    test('a lunch of rice is 8 flat spoons, or 2 serving spoons', () {
+      final lunch = PortionGuide.examples(PlateKind.carb, slot: MealSlot.lunch);
+      expect(lunch[0].scaled(2), '8 flat spoons of rice');
+      expect(lunch[1].scaled(2), '2 serving spoons of rice');
+      expect(lunch[2].scaled(2), '150g pasta or ptitim');
+    });
+
     test('lunch carbs are lunch food, breakfast carbs are breakfast food', () {
       final lunch =
           PortionGuide.examples(PlateKind.carb, slot: MealSlot.lunch);
       expect(lunch.map((e) => e.label), isNot(contains('slices bread')));
       final breakfast =
           PortionGuide.examples(PlateKind.carb, slot: MealSlot.breakfast);
-      expect(breakfast.map((e) => e.label), isNot(contains('fistful of rice')));
+      expect(breakfast.map((e) => e.label), isNot(contains('flat spoons of rice')));
     });
 
-    test('a whey scoop covers two portions', () {
-      // A scoop is ~25g of protein, twice the plan's per-portion figure.
+    test('the breakfast yogurt reads as the tub it comes in', () {
+      // Breakfast is two protein portions, which is the 200g tub.
       final breakfast =
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
-      expect(breakfast.last.scaled(2), '1 whey scoop');
-      expect(breakfast.last.scaled(1), '\u00bd whey scoop');
+      expect(breakfast.last.scaled(2), '200g Greek yogurt 0%');
+      expect(breakfast.map((e) => e.label), isNot(contains('whey scoop')));
     });
 
     test('grams stay grams where an object would not help', () {
@@ -224,7 +231,6 @@ void main() {
     test('a meal offers fish as well as chicken', () {
       final meal = PortionGuide.examples(PlateKind.protein);
       expect(meal[1].scaled(3), '1\u00bd palms of salmon');
-      expect(meal[2].scaled(2), '2 cans of tuna');
     });
 
     test('breakfast protein is not a piece of chicken', () {
