@@ -95,7 +95,7 @@ class PortionGuide {
           return const [
             PortionExample(1.5, '', 'eggs'),
             PortionExample(125, 'g', 'cottage 5%'),
-            PortionExample(100, 'g', 'Greek yogurt 0%'),
+            PortionExample(100, 'g', 'yogurt'),
           ];
         case PlateKind.carb:
           return const [
@@ -108,10 +108,9 @@ class PortionGuide {
       }
     }
     if (slot == MealSlot.lunch && kind == PlateKind.carb) {
-      // Lunch is two carb portions, which is where the plan's own measures
-      // land: 8 flat spoons of rice, or the same as 2 serving spoons.
+      // Lunch is two carb portions, which is the plan's own measure: 2
+      // serving spoons of rice.
       return const [
-        PortionExample(4, '', 'flat spoons of rice'),
         PortionExample(1, '', 'serving spoon of rice',
             plural: 'serving spoons of rice'),
         PortionExample(75, 'g', 'pasta or ptitim'),
@@ -121,7 +120,7 @@ class PortionGuide {
     if (slot == MealSlot.snack && kind == PlateKind.protein) {
       return const [
         PortionExample(1, '', 'protein snack', plural: 'protein snacks'),
-        PortionExample(200, 'g', 'Greek yogurt 0%'),
+        PortionExample(200, 'g', 'yogurt'),
       ];
     }
     if (slot == MealSlot.dinner && kind == PlateKind.protein) {

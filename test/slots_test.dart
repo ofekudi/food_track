@@ -196,11 +196,10 @@ void main() {
       expect(first(PlateKind.carb, 2), '2 fistfuls of rice');
     });
 
-    test('a lunch of rice is 8 flat spoons, or 2 serving spoons', () {
+    test('a lunch of rice is 2 serving spoons', () {
       final lunch = PortionGuide.examples(PlateKind.carb, slot: MealSlot.lunch);
-      expect(lunch[0].scaled(2), '8 flat spoons of rice');
-      expect(lunch[1].scaled(2), '2 serving spoons of rice');
-      expect(lunch[2].scaled(2), '150g pasta or ptitim');
+      expect(lunch[0].scaled(2), '2 serving spoons of rice');
+      expect(lunch[1].scaled(2), '150g pasta or ptitim');
     });
 
     test('lunch carbs are lunch food, breakfast carbs are breakfast food', () {
@@ -209,14 +208,14 @@ void main() {
       expect(lunch.map((e) => e.label), isNot(contains('slices bread')));
       final breakfast =
           PortionGuide.examples(PlateKind.carb, slot: MealSlot.breakfast);
-      expect(breakfast.map((e) => e.label), isNot(contains('flat spoons of rice')));
+      expect(breakfast.map((e) => e.label), isNot(contains('serving spoon of rice')));
     });
 
     test('the breakfast yogurt reads as the tub it comes in', () {
       // Breakfast is two protein portions, which is the 200g tub.
       final breakfast =
           PortionGuide.examples(PlateKind.protein, slot: MealSlot.breakfast);
-      expect(breakfast.last.scaled(2), '200g Greek yogurt 0%');
+      expect(breakfast.last.scaled(2), '200g yogurt');
       expect(breakfast.map((e) => e.label), isNot(contains('whey scoop')));
     });
 
