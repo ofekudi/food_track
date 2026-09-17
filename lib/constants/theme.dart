@@ -3,11 +3,6 @@ import '../models/meal_slot.dart';
 
 /// App-wide theme constants.
 class AppTheme {
-  /// Languages the on-screen keyboard should open in, most wanted first. On
-  /// Android this becomes the IME's hint locales, so a keyboard with Hebrew
-  /// enabled switches to it when a field takes focus.
-  static const List<Locale> keyboardLocales = [Locale('he'), Locale('en')];
-
   /// Colour for one wedge of a composition plate. Deliberately saturated and
   /// distinct rather than shades of the seed colour — the plate has to read at
   /// 36px.

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/insights.dart';
 import '../constants/strings.dart';
-import '../constants/theme.dart';
 import '../models/meal_slot.dart';
 
 /// The one place anything gets logged: a field and a row of things you're
@@ -71,7 +70,6 @@ class _LogDialogState extends State<LogDialog> {
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
               textInputAction: TextInputAction.done,
-              hintLocales: AppTheme.keyboardLocales,
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _submit(),
               decoration: const InputDecoration(
