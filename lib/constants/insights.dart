@@ -27,8 +27,8 @@ class AppInsights {
     return null;
   }
 
-  /// The plan's ~150 calorie treat, for the snack slot.
-  static const _treatIdeas = ['Chocolate', 'Bamba', 'Fruit', 'Beer'];
+  /// The snack slot: its protein first, then the plan's ~150 calorie treat.
+  static const _snackIdeas = ['Protein Snack', 'Chocolate', 'Bamba', 'Fruit'];
 
   static const _breakfastIdeas = ['Shake', 'Yogurt'];
 
@@ -48,7 +48,7 @@ class AppInsights {
       case MealSlot.breakfast:
         return _breakfastIdeas;
       case MealSlot.snack:
-        return _treatIdeas;
+        return _snackIdeas;
       case MealSlot.dinner:
         return _dinnerIdeas;
       case MealSlot.lunch:

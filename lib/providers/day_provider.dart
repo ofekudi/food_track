@@ -5,6 +5,7 @@ import '../models/day_summary.dart';
 import '../models/day_timeline.dart';
 import '../models/entry.dart';
 import '../models/meal_slot.dart';
+import 'settings_provider.dart';
 
 /// How many days the week strip shows.
 const int kWeekLength = 7;
@@ -12,13 +13,36 @@ const int kWeekLength = 7;
 class DayProvider with ChangeNotifier {
   final DBHelper _db = DBHelper();
 
+  /// Where an untouched day gets its mode from. A day you've explicitly
+  /// switched keeps that choice; the rest follow the event-day weekdays.
+  final SettingsProvider _settings;
+
   DateTime _selectedDate = _startOfDay(DateTime.now());
   List<Entry> _entries = [];
-  DayMode _mode = DayMode.normal;
+
+  /// The mode stored for the selected day, or null if it was never switched.
+  DayMode? _explicitMode;
   List<DaySummary> _week = [];
 
+  DayProvider(this._settings) {
+    _settings.addListener(_onSettingsChanged);
+  }
+
+  @override
+  void dispose() {
+    _settings.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  /// Changing the event-day weekdays re-shapes every day that was never
+  /// switched by hand, including the week strip.
+  Future<void> _onSettingsChanged() async {
+    await _loadWeek();
+    notifyListeners();
+  }
+
   DateTime get selectedDate => _selectedDate;
-  DayMode get mode => _mode;
+  DayMode get mode => _explicitMode ?? _settings.defaultModeFor(_selectedDate);
   List<DaySummary> get week => _week;
 
   bool get isToday => _isSameDay(_selectedDate, DateTime.now());
@@ -35,7 +59,7 @@ class DayProvider with ChangeNotifier {
 
   Future<void> _loadDay() async {
     _entries = await _db.entriesForDate(_selectedDate);
-    _mode = await _db.modeForDate(_selectedDate);
+    _explicitMode = await _db.modeForDate(_selectedDate);
   }
 
   Future<void> _loadWeek() async {
@@ -60,7 +84,7 @@ class DayProvider with ChangeNotifier {
             .map((e) => e.slot)
             .toSet(),
         extrasCount: dayEntries.where((e) => e.slot.isExtra).length,
-        mode: modes[key] ?? DayMode.normal,
+        mode: modes[key] ?? _settings.defaultModeFor(date),
       );
     });
   }
@@ -87,7 +111,7 @@ class DayProvider with ChangeNotifier {
 
   Future<void> setMode(DayMode mode) async {
     await _db.setModeForDate(_selectedDate, mode);
-    _mode = mode;
+    _explicitMode = mode;
     await _loadWeek();
     notifyListeners();
   }

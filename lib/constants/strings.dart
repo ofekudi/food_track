@@ -42,6 +42,9 @@ class AppStrings {
 
   /// Reference figure on a slot title, e.g. "470 cal".
   static String calories(int value) => '$value cal';
+  static const eventDays = 'Event days';
+  static const eventDaysSubtitle =
+      'Days that start as an event day. Any day can still be switched by hand.';
   static const save = 'Save';
   static const done = 'Done';
 

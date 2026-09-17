@@ -112,6 +112,20 @@ class _SlotCardState extends State<SlotCard> {
                                                   .colorScheme.onSurfaceVariant,
                                         ),
                                       ),
+                                      // The figure stays on the folded row:
+                                      // once a meal is eaten it's the
+                                      // quickest way to see what the day
+                                      // has come to so far.
+                                      if (calories != null) ...[
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          AppStrings.calories(calories),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: theme.colorScheme.outline,
+                                          ),
+                                        ),
+                                      ],
                                       if (isFilled) ...[
                                         const SizedBox(width: 2),
                                         Icon(
@@ -121,15 +135,6 @@ class _SlotCardState extends State<SlotCard> {
                                           size: 18,
                                           color: theme
                                               .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ] else if (calories != null) ...[
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          AppStrings.calories(calories),
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: theme.colorScheme.outline,
-                                          ),
                                         ),
                                       ],
                                     ],

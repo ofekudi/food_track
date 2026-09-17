@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../constants/strings.dart';
 import '../models/day_mode.dart';
 import '../models/meal_slot.dart';
 import '../providers/settings_provider.dart';
 
-/// One setting: how big your day is. Everything else the app shows is derived
-/// from it, so there's nothing here that can drift out of sync.
+/// Two settings: how big your day is, and which weekdays start out as event
+/// days. The per-slot figures are derived from the first, so there's nothing
+/// here that can drift out of sync.
 class PreferencesScreen extends StatelessWidget {
   const PreferencesScreen({super.key});
 
@@ -64,13 +66,26 @@ class PreferencesScreen extends StatelessWidget {
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Text(
                 AppStrings.caloriesAreReference,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.outline,
                   fontStyle: FontStyle.italic,
                 ),
+              ),
+            ),
+            const Divider(height: 1),
+            const ListTile(
+              leading: Icon(Icons.celebration_outlined),
+              title: Text(AppStrings.eventDays),
+              subtitle: Text(AppStrings.eventDaysSubtitle),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: _WeekdayPicker(
+                selected: settings.eventWeekdays,
+                onChanged: settings.setEventWeekday,
               ),
             ),
           ],
@@ -132,6 +147,54 @@ class _CaloriePickerDialogState extends State<_CaloriePickerDialog> {
           onPressed: () => Navigator.of(context).pop(_value),
           child: const Text(AppStrings.save),
         ),
+      ],
+    );
+  }
+}
+
+/// Seven toggles, one per weekday, in the order the week starts locally.
+class _WeekdayPicker extends StatelessWidget {
+  final Set<int> selected;
+  final void Function(int weekday, bool isEvent) onChanged;
+
+  const _WeekdayPicker({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    // MaterialLocalizations counts from Sunday = 0; DateTime from Monday = 1.
+    final firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
+    final weekdays = List.generate(7, (i) {
+      final sundayBased = (firstDay + i) % 7;
+      return sundayBased == 0 ? DateTime.sunday : sundayBased;
+    });
+    // Any date with the right weekday will do for a label.
+    final monday = DateTime(2024, 1, 1);
+
+    return Row(
+      children: [
+        for (final weekday in weekdays)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FilterChip(
+                showCheckmark: false,
+                padding: EdgeInsets.zero,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                label: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    DateFormat('EEE').format(
+                      monday.add(Duration(days: weekday - DateTime.monday)),
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                selected: selected.contains(weekday),
+                onSelected: (value) => onChanged(weekday, value),
+              ),
+            ),
+          ),
       ],
     );
   }

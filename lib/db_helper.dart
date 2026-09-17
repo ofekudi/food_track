@@ -116,7 +116,9 @@ class DBHelper {
 
   // === Days ===
 
-  Future<DayMode> modeForDate(DateTime date) async {
+  /// The mode you set for [date], or null if you never said — the caller
+  /// decides what an untouched day defaults to.
+  Future<DayMode?> modeForDate(DateTime date) async {
     final db = await database;
     final rows = await db.query(
       'days',
@@ -124,7 +126,7 @@ class DBHelper {
       whereArgs: [formatDay(date)],
       limit: 1,
     );
-    if (rows.isEmpty) return DayMode.normal;
+    if (rows.isEmpty) return null;
     return DayMode.fromString(rows.first['mode'] as String?);
   }
 
