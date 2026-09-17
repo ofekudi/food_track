@@ -27,8 +27,8 @@ class AppInsights {
     return null;
   }
 
-  /// The snack slot: its protein first, then the plan's ~150 calorie treat.
-  static const _snackIdeas = ['Protein Snack', 'Chocolate', 'Bamba', 'Fruit'];
+  /// The snack slot: the plan's ~150 calorie treat, then its protein.
+  static const _snackIdeas = ['Chocolate', 'Bamba', 'Fruit', 'Protein Snack'];
 
   static const _breakfastIdeas = ['Shake', 'Yogurt'];
 
